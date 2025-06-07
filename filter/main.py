@@ -55,6 +55,7 @@ from pubsub import *
 import wsserver
 import threading
 import asyncio
+from ranking_news import ranking_news
 
 
 """
@@ -103,21 +104,20 @@ def main():
     asyncio.run(main_async())
 
 
-# TODO: Тональность
 def tonal_callback(data: filter.NewsPost, pubsub: PubSub) -> None:
     logger.info(f"[tonal] Получен пост: {data}")
     print(f"[tonal] Получен пост: {data}")
 
-    new_data = data  # Вычиление тональности
-    pubsub.publish(EVENT_FILTERED_POST, new_data)
+    good, new_data = ranking_news.is_good_news(data.text)
+    if good:
+        pubsub.publish(EVENT_FILTERED_POST, new_data)
 
 
-# TODO: Ранжирование
 def rank_callback(data, pubsub: PubSub) -> None:
     logger.info(f"[ранжирование] Получен пост: {data}")
     print(f"[ранжирование] Получен пост: {data}")
 
-    new_data = data  # Дополнение поста
+    new_data = data
     pubsub.publish(EVENT_FULL_POST, new_data)
 
 
