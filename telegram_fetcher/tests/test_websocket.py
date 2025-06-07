@@ -16,8 +16,8 @@ TEST_CHANNEL = {
     "link": "https://t.me/durov",
     "title": "Test Channel"
 }
-WS_URL = "ws://localhost:8001/ws"
-API_URL = "http://localhost:8001/api/channels"
+WS_URL = "ws://172.20.10.6:8001/ws"
+API_URL = "http://172.20.10.6:8001/api/channels"
 
 @pytest.fixture(scope="session")
 def event_loop():

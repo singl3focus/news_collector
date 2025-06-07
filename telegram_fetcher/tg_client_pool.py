@@ -5,6 +5,8 @@ import logging
 from typing import List
 from tg_config import API_ID_LIST, API_HASH_LIST, SESSION_NAMES, JSONDB_API_URL
 from telethon.tl.functions.channels import JoinChannelRequest
+import random
+from telethon.errors import UserNotParticipantError, ChannelPrivateError
 
 logger = logging.getLogger(__name__)
 
@@ -58,11 +60,26 @@ class TgClientWorker:
                             if ch["link"] not in self.my_links:
                                 try:
                                     username = ch["link"].split("/")[-1]
-                                    await self.client(JoinChannelRequest(channel=username))
+                                    # Проверяем, находимся ли мы уже в канале
+                                    try:
+                                        channel = await self.client.get_entity(username)
+                                        # Пробуем получить информацию о канале
+                                        # Если мы не участник, это вызовет ChannelPrivateError
+                                        await self.client.get_permissions(channel)
+                                        logger.info(f"Already a member of {ch['link']}")
+                                    except ChannelPrivateError:
+                                        # Если мы не участник, присоединяемся
+                                        delay = random.uniform(5, 15)
+                                        logger.info(f"Waiting {delay:.1f} seconds before joining {ch['link']}")
+                                        await asyncio.sleep(delay)
+                                        await self.client(JoinChannelRequest(channel=username))
+                                        logger.info(f"Joined {ch['link']}")
+                                    except Exception as e:
+                                        logger.error(f"Error checking/joining {ch['link']}: {e}")
+                                        continue
                                     self.my_links.add(ch["link"])
-                                    logger.info(f"Joined {ch['link']}")
                                 except Exception as e:
-                                    logger.error(f"Error joining {ch['link']}: {e}")
+                                    logger.error(f"Error processing {ch['link']}: {e}")
                         retry_delay = 1
                     else:
                         logger.error(f"Failed to fetch channels: {response.status}")

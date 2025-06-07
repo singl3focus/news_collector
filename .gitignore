@@ -37,3 +37,8 @@ ENV/
 
 # Logs
 *.log 
+
+# Telegram sessions
+telegram_fetcher/sessions/
+*.session
+*.session-journal
