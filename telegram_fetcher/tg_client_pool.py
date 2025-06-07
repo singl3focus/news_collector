@@ -3,17 +3,13 @@ from telethon import TelegramClient, events
 import requests
 import os
 from dotenv import load_dotenv
-
-load_dotenv()
-
-API_ID_LIST = [int(os.getenv("API_ID_1")), int(os.getenv("API_ID_2"))]
-API_HASH_LIST = [os.getenv("API_HASH_1"), os.getenv("API_HASH_2")]
-SESSION_NAMES = [os.getenv("SESSION_NAME_1"), os.getenv("SESSION_NAME_2")]
-JSONDB_API_URL = os.getenv("JSONDB_API_URL", "http://localhost:8001/channels")
+from tg_config import API_ID_LIST, API_HASH_LIST, SESSION_NAMES, JSONDB_API_URL
 
 class TgClientWorker:
     def __init__(self, api_id, api_hash, session_name, queue, worker_index, total_workers):
-        self.client = TelegramClient(session_name, api_id, api_hash)
+        # Сессии сохраняются в папку sessions (создаётся в tg_config.py)
+        session_path = os.path.join("sessions", session_name)
+        self.client = TelegramClient(session_path, api_id, api_hash)
         self.queue = queue
         self.worker_index = worker_index
         self.total_workers = total_workers
