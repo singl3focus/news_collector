@@ -2,4 +2,4 @@
 *.log
 /*.log/*
 **/*pycache**/
-venv
+**/*env*/

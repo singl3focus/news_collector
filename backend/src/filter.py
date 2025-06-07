@@ -6,7 +6,7 @@ from datetime import datetime
 from collections import deque
 from simhash import Simhash, SimhashIndex
 import logging
-from pubsub import *
+from .pubsub import *
 
 logger = logging.getLogger(__name__)
 

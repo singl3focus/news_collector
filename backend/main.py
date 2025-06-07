@@ -1,6 +1,8 @@
 import logging
 import config
 
+CONFIG_FILE = "config.yaml"
+
 
 def define_log_level(level: str) -> int:
     level = level.upper().strip()
@@ -20,7 +22,7 @@ def define_log_level(level: str) -> int:
 def setup_logging() -> None:
     """Настройка логирования при запуске приложения"""
 
-    cfg = config.parse_config("config.yaml")
+    cfg = config.parse_config(CONFIG_FILE)
 
     root_logger = logging.getLogger()
     root_logger.setLevel(define_log_level(cfg.logger.log_level))
@@ -49,13 +51,13 @@ setup_logging()
 
 logger = logging.getLogger(__name__)
 
-import redis_init
-import filter
-from pubsub import *
-import wsserver
-import threading
 import asyncio
-from ranking_news import ranking_news
+import threading 
+from src import redis_init
+from src import filter
+from src import wsserver
+from src.ranking import ranking_news
+from src.pubsub import *
 
 
 """
@@ -68,11 +70,8 @@ TODO:
 После сделать работу с юзерами в БД (redis). CRON, который в 19 по МСК собирает инфу по юзерам и скидывает их
 """
 
-CONFIG_FILE = "config.yaml"
-
 
 async def main_async():
-    """Асинхронная главная функция приложения"""
     cfg = config.parse_config(CONFIG_FILE)
     r = redis_init.setup_redis(cfg.database.host, cfg.database.port)
     event_bus = PubSub()
@@ -89,7 +88,7 @@ async def main_async():
         port=cfg.network.server_port
     )
     event_bus.subscribe(EVENT_FULL_POST, ws_server.process_event)
-    threading.Thread(target=ws_server.start, daemon=True).start()
+    ws_server.start()
 
     # Запуск обработки сообщений как асинхронной задачи
     asyncio.create_task(filter.receive_posts(cfg.network.collector_uri, event_bus))
@@ -106,7 +105,6 @@ def main():
 
 def tonal_callback(data: filter.NewsPost, pubsub: PubSub) -> None:
     logger.info(f"[tonal] Получен пост: {data}")
-    print(f"[tonal] Получен пост: {data}")
 
     good, new_data = ranking_news.is_good_news(data.text)
     if good:
@@ -115,7 +113,6 @@ def tonal_callback(data: filter.NewsPost, pubsub: PubSub) -> None:
 
 def rank_callback(data, pubsub: PubSub) -> None:
     logger.info(f"[ранжирование] Получен пост: {data}")
-    print(f"[ранжирование] Получен пост: {data}")
 
     new_data = data
     pubsub.publish(EVENT_FULL_POST, new_data)

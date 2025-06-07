@@ -1,5 +1,5 @@
-import analysis_text
-from analysis_stock_market import MoexStockAnalyzer
+from . import analysis_text
+from .analysis_stock_market import MoexStockAnalyzer
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 

@@ -3,8 +3,8 @@ import json
 import uuid
 import websockets
 import threading
-from pubsub import PubSub
-from filter import NewsPost
+from .pubsub import PubSub
+from .filter import NewsPost
 
 
 class WSServer:
@@ -15,7 +15,6 @@ class WSServer:
         self.host = host
         self.port = port
         self.server = None
-        self.loop = asyncio.new_event_loop()  # Создаем отдельный event loop
 
     async def handler(self, websocket):
         self.clients.add(websocket)
@@ -38,12 +37,21 @@ class WSServer:
         asyncio.run_coroutine_threadsafe(self.broadcast(post), self.loop)
 
     def start(self):
-        # Запуск сервера в отдельном потоке с собственным event loop
+        """Запуск WebSocket сервера в отдельном потоке с собственным event loop"""
         def run_server():
-            asyncio.set_event_loop(self.loop)
-            self.server = self.loop.run_until_complete(
-                websockets.serve(self.handler, self.host, self.port)
-            )
-            self.loop.run_forever()
-
-        threading.Thread(target=run_server, daemon=True).start()
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            async def start():
+                server = await websockets.serve(
+                    self.handler, 
+                    self.host, 
+                    self.port
+                )
+                logger.info(f"WebSocket server started on {self.host}:{self.port}")
+                await asyncio.Future()  # Бесконечное ожидание
+            
+            loop.run_until_complete(start())
+        
+        self.thread = threading.Thread(target=run_server, daemon=True)
+        self.thread.start()
