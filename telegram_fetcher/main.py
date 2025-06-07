@@ -1,57 +1,118 @@
 import asyncio
+import logging
+import signal
+from typing import List
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from jsondb_api import app as rest_app, db
-from ws_server import app as ws_app, websocket_endpoint
+from jsondb import JsonDB
+from jsondb_api import ChannelIn, db, rate_limiter
 from tg_client_pool import TgClientWorker, run_pool
 
-# Объединяем REST API и WebSocket в один FastAPI приложение
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Инициализация хранилища каналов
+db = JsonDB()
+
+# Создаем единое FastAPI приложение
 app = FastAPI(title="Telegram Fetcher Service")
 
-# Добавляем CORS middleware для REST API
+# Добавляем CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Разрешаем запросы с любого origin (в продакшене лучше ограничить)
+    allow_origins=["*"],  # В продакшене лучше ограничить
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Монтируем REST API приложение по пути /api
-app.mount("/api", rest_app)
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    client_id = request.client.host
+    if rate_limiter.is_rate_limited(client_id):
+        raise HTTPException(status_code=429, detail="Too many requests")
+    return await call_next(request)
 
-# Монтируем WebSocket endpoint
-app.websocket("/ws")(websocket_endpoint)
+@app.get("/api/channels")
+async def get_channels():
+    try:
+        return db.get_channels()
+    except Exception as e:
+        logger.error(f"Error getting channels: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
-# Глобальная очередь сообщений
-queue = asyncio.Queue()
+@app.post("/api/channels")
+async def add_channel(channel: ChannelIn):
+    try:
+        db.add_channel(channel.dict())
+        return {"ok": True}
+    except Exception as e:
+        logger.error(f"Error adding channel: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
-# Конфигурация Telegram клиентов
-# TODO: Замените на свои значения API_ID, API_HASH и SESSION_NAMES
-API_ID_LIST = [123456, 789012]  # Пример
-API_HASH_LIST = ["your_api_hash_1", "your_api_hash_2"]  # Пример
-SESSION_NAMES = ["client1", "client2"]  # Пример
+@app.delete("/api/channels/{link}")
+async def delete_channel(link: str):
+    try:
+        db.remove_channel(link)
+        return {"ok": True}
+    except Exception as e:
+        logger.error(f"Error deleting channel: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
-async def start_telegram_clients():
-    """Запускает пул Telegram клиентов."""
-    global queue
-    await run_pool(queue)
+# Глобальные переменные
+queue: asyncio.Queue = None
+workers: List[TgClientWorker] = None
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket):
+    """WebSocket endpoint для отправки сообщений клиентам."""
+    await websocket.accept()
+    try:
+        while True:
+            msg = await queue.get()
+            await websocket.send_json(msg)
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+
+async def shutdown():
+    """Корректное завершение работы сервиса."""
+    logger.info("Shutting down...")
+    if workers:
+        for w in workers:
+            await w.stop()
+    logger.info("Shutdown complete")
 
 @app.on_event("startup")
 async def startup_event():
-    """Запускает Telegram клиентов при старте сервера."""
-    asyncio.create_task(start_telegram_clients())
-
-async def main():
+    """Запуск сервиса при старте."""
+    global queue, workers
     queue = asyncio.Queue()
-    # Подставляем очередь в ws_server
-    import ws_server
-    ws_server.queue = queue
-    await run_pool(queue)
-    uvicorn.run(ws_app, host="0.0.0.0", port=8002)
+    workers = await run_pool(queue)
+    logger.info("Service started")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Обработка завершения работы сервиса."""
+    await shutdown()
+
+def handle_sigterm(*_):
+    """Обработка сигнала SIGTERM."""
+    logger.info("Received SIGTERM")
+    asyncio.create_task(shutdown())
 
 if __name__ == "__main__":
-    # jsondb_api поднимаем отдельно: uvicorn telegram_fetcher.jsondb_api:app --host 0.0.0.0 --port 8001
-    # а main.py — как основной воркер Telegram и WS
-    asyncio.run(main()) 
+    # Регистрируем обработчик SIGTERM
+    signal.signal(signal.SIGTERM, handle_sigterm)
+    
+    # Запускаем сервер
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8001,
+        log_level="info"
+    ) 
