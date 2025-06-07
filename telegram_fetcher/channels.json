@@ -1,3 +1,16 @@
 {
-  "channels": []
+  "channels": [
+    {
+      "link": "https://t.me/trade",
+      "title": "Trade Watcher"
+    },
+    {
+      "link": "https://t.me/markettwits",
+      "title": "MarketTwits"
+    },
+    {
+      "link": "https://t.me/fuckgerchik",
+      "title": "Gerchik Test Trades"
+    }
+  ]
 }

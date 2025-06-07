@@ -4,6 +4,7 @@ import aiohttp
 import logging
 from typing import List
 from tg_config import API_ID_LIST, API_HASH_LIST, SESSION_NAMES, JSONDB_API_URL
+from telethon.tl.functions.channels import JoinChannelRequest
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +46,8 @@ class TgClientWorker:
 
     async def refresh_channels_loop(self):
         """Периодическое обновление списка каналов."""
-        retry_delay = 1  # Start with 1 second delay
-        max_retry_delay = 30  # Maximum delay between retries
+        retry_delay = 1
+        max_retry_delay = 30
         while True:
             try:
                 async with self.session.get(JSONDB_API_URL) as response:
@@ -56,27 +57,24 @@ class TgClientWorker:
                         for ch in part:
                             if ch["link"] not in self.my_links:
                                 try:
-                                    await self.client.join_chat(ch["link"])
+                                    username = ch["link"].split("/")[-1]
+                                    await self.client(JoinChannelRequest(channel=username))
                                     self.my_links.add(ch["link"])
                                     logger.info(f"Joined {ch['link']}")
                                 except Exception as e:
                                     logger.error(f"Error joining {ch['link']}: {e}")
-                        # Reset retry delay on success
                         retry_delay = 1
                     else:
                         logger.error(f"Failed to fetch channels: {response.status}")
-                        # Use exponential backoff for retries
                         await asyncio.sleep(retry_delay)
                         retry_delay = min(retry_delay * 2, max_retry_delay)
                         continue
             except Exception as e:
                 logger.error(f"Error in refresh_channels_loop: {e}")
-                # Use exponential backoff for retries
                 await asyncio.sleep(retry_delay)
                 retry_delay = min(retry_delay * 2, max_retry_delay)
                 continue
-            
-            # If we get here, we had a successful request, so wait the normal interval
+
             await asyncio.sleep(30)
 
     async def on_message(self, event):
