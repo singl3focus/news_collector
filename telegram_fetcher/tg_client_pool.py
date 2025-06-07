@@ -103,7 +103,7 @@ class TgClientWorker:
                     "timestamp": event.date.isoformat(),
                     "channel_id": ch.id,
                     "channel_title": getattr(ch, "title", ""),
-                    "text": event.text,
+                    "text": event.message.raw_text,
                 }
                 await self.queue.put(msg)
         except Exception as e:
