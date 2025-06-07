@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+telethon
+python-dotenv
+requests
+pydantic 

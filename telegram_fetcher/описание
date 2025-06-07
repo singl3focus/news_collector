@@ -1,0 +1,226 @@
+Отлично, давай сразу структурируем проект и соберём модульный Python-сервис, который:
+	•	хранит каналы в БД (можно расширять через API/консоль),
+	•	запускает пул Telegram-клиентов (Telethon),
+	•	распределяет каналы между клиентами, подписывает на новые сообщения,
+	•	поддерживает добавление каналов по ссылке (join),
+	•	отправляет все новые сообщения в очередь,
+	•	ретранслирует их через WebSocket (FastAPI).
+
+Стек:
+	•	Python 3.10+
+	•	Telethon (Telegram-клиенты)
+	•	FastAPI (WebSocket API)
+	•	asyncio.Queue (очередь сообщений)Отлично, делаем минималистичное, но удобное решение:
+	•	Модуль-обертка над JSON-файлом (читаем и пишем туда список каналов),
+	•	Интерфейс через локальный HTTP API (например, на FastAPI):
+	•	добавить канал,
+	•	удалить канал,
+	•	получить список каналов.
+	•	Остальная часть пайплайна работает как раньше: периодически обновляет список каналов через этот API, балансирует по клиентам.
+
+Такой подход:
+	•	Убирает зависимости от БД,
+	•	Очень прост в отладке,
+	•	Позволяет быстро расширять API.
+
+⸻
+
+Структура проекта
+
+tg_monitoring_service/
+├── jsondb.py          # Модуль для работы с каналами (JSON)
+├── jsondb_api.py      # FastAPI-сервер для управления каналами
+├── tg_client_pool.py  # Пул Telegram-клиентов
+├── ws_server.py       # WebSocket API
+├── main.py            # Запуск сервиса
+└── requirements.txt
+
+
+⸻
+
+1. jsondb.py — обертка над json
+
+import json
+import threading
+from typing import List, Dict
+
+class JsonDB:
+    def __init__(self, filename="channels.json"):
+        self.filename = filename
+        self.lock = threading.Lock()
+        try:
+            with open(self.filename, "r") as f:
+                self.data = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            self.data = {"channels": []}
+            self._save()
+
+    def _save(self):
+        with self.lock:
+            with open(self.filename, "w") as f:
+                json.dump(self.data, f, ensure_ascii=False, indent=2)
+
+    def get_channels(self) -> List[Dict]:
+        with self.lock:
+            return list(self.data["channels"])
+
+    def add_channel(self, channel: Dict):
+        with self.lock:
+            if not any(c["link"] == channel["link"] for c in self.data["channels"]):
+                self.data["channels"].append(channel)
+                self._save()
+
+    def remove_channel(self, link: str):
+        with self.lock:
+            self.data["channels"] = [c for c in self.data["channels"] if c["link"] != link]
+            self._save()
+
+
+⸻
+
+2. jsondb_api.py — HTTP API для управления каналами
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from jsondb import JsonDB
+
+db = JsonDB()
+
+class ChannelIn(BaseModel):
+    link: str
+    title: str = ""
+
+app = FastAPI()
+
+@app.get("/channels")
+def get_channels():
+    return db.get_channels()
+
+@app.post("/channels")
+def add_channel(channel: ChannelIn):
+    db.add_channel(channel.dict())
+    return {"ok": True}
+
+@app.delete("/channels/{link}")
+def delete_channel(link: str):
+    db.remove_channel(link)
+    return {"ok": True}
+
+
+⸻
+
+3. tg_client_pool.py — пул клиентов, периодический fetch
+
+import asyncio
+from telethon import TelegramClient, events
+import requests
+
+API_ID_LIST = [123456, 789012, ...]
+API_HASH_LIST = ["...", "...", ...]
+SESSION_NAMES = ["client1", "client2", ...]
+
+JSONDB_API_URL = "http://localhost:8001/channels"
+
+class TgClientWorker:
+    def __init__(self, api_id, api_hash, session_name, queue, worker_index, total_workers):
+        self.client = TelegramClient(session_name, api_id, api_hash)
+        self.queue = queue
+        self.worker_index = worker_index
+        self.total_workers = total_workers
+        self.my_links = set()
+
+    async def start(self):
+        await self.client.start()
+        self.client.add_event_handler(self.on_message, events.NewMessage)
+        print(f"[{self.client.session.filename}] started")
+        asyncio.create_task(self.refresh_channels_loop())
+
+    async def refresh_channels_loop(self):
+        while True:
+            channels = requests.get(JSONDB_API_URL).json()
+            part = [c for i, c in enumerate(channels) if i % self.total_workers == self.worker_index]
+            # Join to new channels
+            for ch in part:
+                if ch["link"] not in self.my_links:
+                    try:
+                        await self.client.join_chat(ch["link"])
+                        self.my_links.add(ch["link"])
+                        print(f"Joined {ch['link']}")
+                    except Exception as e:
+                        print(f"Error join {ch['link']}: {e}")
+            await asyncio.sleep(30)
+
+    async def on_message(self, event):
+        ch = await event.get_chat()
+        if getattr(ch, "username", None) in self.my_links or f"https://t.me/{getattr(ch, 'username', '')}" in self.my_links:
+            msg = {
+                "timestamp": event.date.isoformat(),
+                "channel_id": ch.id,
+                "channel_title": getattr(ch, "title", ""),
+                "text": event.text,
+            }
+            await self.queue.put(msg)
+
+async def run_pool(queue):
+    workers = []
+    N = len(SESSION_NAMES)
+    for i, (api_id, api_hash, session) in enumerate(zip(API_ID_LIST, API_HASH_LIST, SESSION_NAMES)):
+        w = TgClientWorker(api_id, api_hash, session, queue, i, N)
+        await w.start()
+        workers.append(w)
+    return workers
+
+
+⸻
+
+4. ws_server.py — WebSocket API
+
+from fastapi import FastAPI, WebSocket
+import asyncio
+
+app = FastAPI()
+queue = None  # подставим из main.py
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    while True:
+        msg = await queue.get()
+        await websocket.send_json(msg)
+
+
+⸻
+
+5. main.py — запуск всех сервисов
+
+import asyncio
+import uvicorn
+from ws_server import app as ws_app
+from tg_client_pool import run_pool
+
+async def main():
+    queue = asyncio.Queue()
+    await run_pool(queue)
+    # Поднимаем WS сервер на другом порту, чтобы не мешать jsondb_api
+    uvicorn.run(ws_app, host="0.0.0.0", port=8002)
+
+if __name__ == "__main__":
+    # jsondb_api поднимаем отдельно: uvicorn jsondb_api:app --host 0.0.0.0 --port 8001
+    # а main.py — как основной воркер Telegram и WS
+    asyncio.run(main())
+
+
+⸻
+
+Как запускать:
+	1.	uvicorn jsondb_api:app --host 0.0.0.0 --port 8001 — REST API для управления каналами.
+	2.	python main.py — Telegram monitoring + WebSocket сервер.
+	3.	Клиенты WebSocket коннектятся к ws://localhost:8002/ws, получают уведомления.
+
+⸻
+
+Итого:
+	•	Все каналы централизованно хранятся в JSON, управляются через API.
+	•	Локальный воркер Telegram периодически (каждые 30 сек) берет актуальный список, балансирует и слушает нужные каналы.
+	•	Удобно расширять и дорабатывать.
+
