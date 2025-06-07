@@ -5,6 +5,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+import matplotlib.dates as mdates
 from datetime import datetime, timedelta
 
 class MoexStockAnalyzer:
@@ -47,7 +49,7 @@ class MoexStockAnalyzer:
         except Exception as e:
             return None
     
-    def analyze_stocks(self):
+    def analyze_stocks(self, change_stock=0.01):
         results = []
         for ticker in self.tickers:
             data = self.get_market_data(ticker)
@@ -67,8 +69,19 @@ class MoexStockAnalyzer:
                     'change': data[fields['change']],
                     'change_percent': data[fields['change_prcnt']],
                     'volume': data[fields['volume']],
-                    'time': data[fields['time']] if fields['time'] < len(data) else None
+                    'time': data[fields['time']] if fields['time'] < len(data) else None,
+                    'price_range': data[fields['high'] - data[fields['low']]],
                 }
+
+                if result['change'] > change_stock:
+                    result['trend'] = 1
+                elif result['change'] < -change_stock:
+                    result['trend'] = -1
+
+                if result['price_range'] > data[fields['open']] * 0.01:
+                    result['volatility'] = 1
+                else:
+                    result['volatility'] = 0
                     
                 results.append(result)
             except IndexError as e:
@@ -78,23 +91,25 @@ class MoexStockAnalyzer:
     
     def plot_separate_charts(self, minutes_back=60, interval=10):
         num_plots = len(self.tickers)
-        fig, axes = plt.subplots(num_plots, 1, figsize=(14, 5*num_plots))
-        
-        if num_plots == 1:
-            axes = [axes]
-        
+        fig, axes = plt.subplots(num_plots, 1, figsize=(14, 4.5 * num_plots), squeeze=False)
+        axes = axes.flatten()
+
         for idx, ticker in enumerate(self.tickers):
             ax = axes[idx]
             df = self.get_candles(ticker, interval, minutes_back)
-            if df is None or df.empty:
+
+            if df is None or df.empty or 'close' not in df.columns or 'begin' not in df.columns:
+                ax.set_title(f"{ticker} — данные недоступны")
                 continue
-                
-            if 'close' not in df.columns or 'begin' not in df.columns:
-                continue
-                
-            try:
+
+            try:           
+                df = df.copy()
+                df['begin'] = pd.to_datetime(df['begin'], errors='coerce')
+                df = df.dropna(subset=['begin'])
                 df['change'] = df['close'].diff()
-                
+                df['trend'] = df['change'].apply(lambda x: 'up' if x > 0 else 'down')
+                df['group'] = (df['trend'] != df['trend'].shift()).cumsum()
+
                 sns.lineplot(
                     data=df,
                     x='begin',
@@ -104,44 +119,31 @@ class MoexStockAnalyzer:
                     alpha=0.3,
                     ax=ax
                 )
-                
-                prev_trend = None
-                start_idx = 0
-                
-                for i in range(1, len(df)):
-                    current_trend = 'up' if df['change'].iloc[i] > 0 else 'down'
-                    
-                    if prev_trend is None:
-                        prev_trend = current_trend
-                    
-                    if current_trend != prev_trend:
-                        segment = df.iloc[start_idx:i]
-                        color = 'green' if prev_trend == 'up' else 'red'
-                        ax.plot(segment['begin'], segment['close'], 
-                               color=color, linewidth=2)
-                        
-                        start_idx = i
-                        prev_trend = current_trend
-                
-                segment = df.iloc[start_idx:]
-                color = 'green' if prev_trend == 'up' else 'red'
-                ax.plot(segment['begin'], segment['close'], 
-                       color=color, linewidth=2)
-                
-                ax.set_xlabel('Время')
+
+                for _, group_df in df.groupby('group'):
+                    if len(group_df) < 2:
+                        continue
+                    color = 'green' if group_df['trend'].iloc[0] == 'up' else 'red'
+                    ax.plot(group_df['begin'], group_df['close'], color=color, linewidth=2)
+
+                ax.set_title(f'{ticker}', fontsize=12)
+                ax.set_xlabel('Время', fontsize=10)
                 ax.set_ylabel('Цена (руб)', fontsize=10)
+
+                ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M %d-%m-%Y'))
+                ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+
                 ax.grid(True, linestyle='--', alpha=0.5)
-                
-                from matplotlib.lines import Line2D
+
                 legend_elements = [
                     Line2D([0], [0], color='green', lw=2, label='Рост'),
                     Line2D([0], [0], color='red', lw=2, label='Падение')
                 ]
                 ax.legend(handles=legend_elements, fontsize=9)
-                
+
             except Exception as e:
-                continue
-        
+                ax.set_title(f"{ticker} — ошибка: {e}")
+
         plt.tight_layout()
         buf = io.BytesIO()
         plt.savefig(buf, format='png')
@@ -149,3 +151,7 @@ class MoexStockAnalyzer:
         im = Image.open(buf)
         return im
 
+
+moex_stock_analyzer = MoexStockAnalyzer()
+print(moex_stock_analyzer.analyze_stocks())
+moex_stock_analyzer.plot_separate_charts(minutes_back=3600).show()
