@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7.0-alpine
+    container_name: news_pipeline_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --save 60 1 --loglevel warning
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 30s
+      retries: 5
+
+  news_pipeline:
+    build: .
+    container_name: news_pipeline_app
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "8001:8001"  # Порт для веб-сокет сервера
+    volumes:
+      - ./src:/app/src
+      - ./config.yaml:/app/config.yaml
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: python -m src.main
+
+volumes:
+  redis_data:

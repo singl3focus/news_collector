@@ -1,0 +1,12 @@
+network:
+  collector_uri: "ws://172.20.10.6:8001/ws"
+  server_host: "0.0.0.0"
+  server_port: 9999
+
+database:
+  host: "localhost"
+  port: "6379"
+
+logger:
+  log_level: "DEBUG"
+  log_file: "news_processor.log"
