@@ -1,5 +1,5 @@
 network:
-  collector_uri: "ws://172.20.10.6:8001/ws"
+  collector_uri: "ws://89.104.71.190:8001/ws"
   server_host: "0.0.0.0"
   server_port: 9999
 

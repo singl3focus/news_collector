@@ -48,7 +48,6 @@ class WSServer:
                     self.host, 
                     self.port
                 )
-                logger.info(f"WebSocket server started on {self.host}:{self.port}")
                 await asyncio.Future()  # Бесконечное ожидание
             
             loop.run_until_complete(start())

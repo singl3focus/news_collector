@@ -104,15 +104,15 @@ def main():
 
 
 def tonal_callback(data: filter.NewsPost, pubsub: PubSub) -> None:
-    logger.info(f"[tonal] Получен пост: {data}")
+    logger.info(f"[tonal] Get post: {data}")
 
-    good, new_data = ranking_news.is_good_news(data.text)
+    good, new_data = ranking_news.is_good_news(data)
     if good:
         pubsub.publish(EVENT_FILTERED_POST, new_data)
 
 
-def rank_callback(data, pubsub: PubSub) -> None:
-    logger.info(f"[ранжирование] Получен пост: {data}")
+def rank_callback(data: ranking_news.Post, pubsub: PubSub) -> None:
+    logger.info(f"[rank] Get post: {data}")
 
     new_data = data
     pubsub.publish(EVENT_FULL_POST, new_data)

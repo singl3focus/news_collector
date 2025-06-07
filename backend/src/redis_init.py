@@ -15,8 +15,8 @@ def setup_redis(host: str, port: int) -> redis.Redis:
     while True:
         try:
             if r.ping():
-                logger.info("Успешное подключение к Redis!")
+                logger.info("Redis has been connected")
                 return r
         except redis.ConnectionError:
-            logger.info("Ожидание Redis...")
+            logger.info("Waiting Redis...")
             time.sleep(1)

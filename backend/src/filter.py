@@ -133,3 +133,4 @@ async def receive_posts(uri: str, pubsub: PubSub):
             logger.warning("Connection closed")
         except Exception as e:
             logger.exception(f"Critical error: {e}")
+            
