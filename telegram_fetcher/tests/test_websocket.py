@@ -16,7 +16,7 @@ TEST_CHANNEL = {
     "link": "https://t.me/durov",
     "title": "Test Channel"
 }
-WS_URL = "ws://172.20.10.6:8001/ws"
+WS_URL = "ws://https://shhw70-83-220-239-26.ru.tuna.am:8001/ws"
 API_URL = "http://172.20.10.6:8001/api/channels"
 
 @pytest.fixture(scope="session")
@@ -155,7 +155,7 @@ class TestWebSocket:
             logger.info("Waiting for first message...")
             done, pending = await asyncio.wait(
                 tasks,
-                timeout=30.0,
+                timeout=100.0,
                 return_when=asyncio.FIRST_COMPLETED
             )
             

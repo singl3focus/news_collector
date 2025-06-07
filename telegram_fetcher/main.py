@@ -69,7 +69,7 @@ async def add_channel(channel: ChannelIn):
         
         # Добавляем канал
         logger.info(f"Adding channel to database: {channel.link}")
-        db.add_channel(channel.dict())
+        db.add_channel(dict(channel))
         channel_status[channel.link] = "pending"
         logger.info(f"Channel {channel.link} added to database, status set to pending")
         
@@ -95,6 +95,48 @@ async def delete_channel(link: str):
         return {"ok": True}
     except Exception as e:
         logger.error(f"Error deleting channel: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.get("/api/channel_id/{link}")
+async def get_channel_id(link: str):
+    """
+    Получает ID канала по его ссылке.
+    
+    Args:
+        link: Ссылка на канал в формате https://t.me/username или @username
+        
+    Returns:
+        dict: Словарь с ID канала и дополнительной информацией
+    """
+    try:
+        if not workers:
+            raise HTTPException(status_code=503, detail="No Telegram clients available")
+        
+        # Извлекаем username из ссылки
+        username = link.split("/")[-1].replace("@", "")
+        
+        # Используем первый доступный клиент для получения информации
+        worker = workers[0]
+        
+        try:
+            # Получаем информацию о канале
+            channel = await worker.client.get_entity(username)
+            
+            return {
+                "ok": True,
+                "channel_id": channel.id,
+                "username": username,
+                "title": getattr(channel, "title", ""),
+                "type": "channel" if hasattr(channel, "broadcast") else "group"
+            }
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=f"Channel not found: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error getting channel info: {e}")
+            raise HTTPException(status_code=500, detail=f"Error getting channel info: {str(e)}")
+            
+    except Exception as e:
+        logger.error(f"Error in get_channel_id: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 async def check_channel_connection(channel_link: str, timeout: int = 60):

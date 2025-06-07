@@ -2,55 +2,77 @@
   "channels": [
     {
       "link": "https://t.me/trade",
-      "title": "Trade Watcher"
+      "title": "Trade Watcher",
+      "status": "pending"
     },
     {
       "link": "https://t.me/markettwits",
-      "title": "MarketTwits"
+      "title": "MarketTwits",
+      "status": "pending"
     },
     {
       "link": "https://t.me/fuckgerchik",
-      "title": "Gerchik Test Trades"
+      "title": "Gerchik Test Trades",
+      "status": "pending"
     },
     {
       "link": "https://t.me/vladitrade",
-      "title": "vladitrade"
+      "title": "vladitrade",
+      "status": "pending"
     },
     {
       "link": "https://t.me/tb_invest_official",
-      "title": "TB Invest Official"
+      "title": "TB Invest Official",
+      "status": "pending"
     },
     {
       "link": "https://t.me/crypto_FMvolna",
-      "title": "Crypto FM Volna"
+      "title": "Crypto FM Volna",
+      "status": "pending"
     },
     {
       "link": "https://t.me/rian_ru",
-      "title": "РИА Новости"
+      "title": "РИА Новости",
+      "status": "pending"
     },
     {
       "link": "https://t.me/DavydovIn",
-      "title": "Davydov In"
+      "title": "Davydov In",
+      "status": "pending"
     },
     {
       "link": "https://t.me/INSIDERR_POLITIC",
-      "title": "INSIDERR POLITIC"
+      "title": "INSIDERR POLITIC",
+      "status": "pending"
     },
     {
       "link": "https://t.me/bazabazon",
-      "title": "BazaBazon"
+      "title": "BazaBazon",
+      "status": "pending"
     },
     {
       "link": "https://t.me/meduzalive",
-      "title": "Meduza Live"
+      "title": "Meduza Live",
+      "status": "pending"
     },
     {
       "link": "https://t.me/rt_russian",
-      "title": "RT Russian"
+      "title": "RT Russian",
+      "status": "pending"
     },
     {
       "link": "https://t.me/ecotopor",
-      "title": "EcoTopor"
+      "title": "EcoTopor",
+      "status": "pending"
+    },
+    {
+      "link": "https://t.me/cointrendz_whalehunter",
+      "title": "Whale Hunter",
+      "status": "pending"
+    },
+    {
+      "link": "https://t.me/durov",
+      "title": ""
     }
   ]
 }

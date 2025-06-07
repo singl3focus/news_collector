@@ -41,7 +41,7 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             if queue is None:
                 logger.error("Queue not initialized")
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.4)
                 continue
             try:
                 msg = await queue.get()

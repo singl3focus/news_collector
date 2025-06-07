@@ -23,13 +23,12 @@ class JsonDB:
 
     def _save(self):
         """Save data to JSON file with thread safety."""
-        with self.lock:
-            try:
-                with open(self.filename, "w") as f:
-                    json.dump(self.data, f, ensure_ascii=False, indent=2)
-            except Exception as e:
-                logger.error(f"Error saving to {self.filename}: {e}")
-                raise
+        try:
+            with open(self.filename, "w") as f:
+                json.dump(self.data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logger.error(f"Error saving to {self.filename}: {e}")
+            raise
 
     def get_channels(self) -> List[Dict]:
         """Get list of all channels."""

@@ -8,7 +8,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 async def test_websocket():
-    uri = "ws://172.20.10.6:8001/ws"
+    uri = "ws://localhost:8001/ws"
     try:
         async with websockets.connect(uri) as websocket:
             logger.info("Connected to WebSocket server")

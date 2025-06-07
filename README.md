@@ -11,12 +11,14 @@ A robust service for monitoring and collecting messages from Telegram channels. 
 - 🔒 Rate limiting and security features
 - 📊 Multiple Telegram client support for load balancing
 - 💾 Simple JSON-based channel storage
+- 🧪 Built-in API testing tools
 
 ## Prerequisites
 
 - Python 3.10 or higher
 - Telegram API credentials (API ID and API Hash)
 - Virtual environment (recommended)
+- `jq` for JSON processing (for testing)
 
 ## Installation
 
@@ -50,6 +52,18 @@ SESSION_NAME_2=client2
 JSONDB_API_URL=http://localhost:8001/api/channels
 ```
 
+5. Install `jq` for JSON processing (required for testing):
+```bash
+# On macOS:
+brew install jq
+
+# On Ubuntu/Debian:
+sudo apt-get install jq
+
+# On Windows (with Chocolatey):
+choco install jq
+```
+
 ## Running the Service
 
 The service consists of two main components:
@@ -69,22 +83,65 @@ uvicorn telegram_fetcher.main:app --host 0.0.0.0 --port 8001
 ```http
 GET /api/channels
 ```
-Returns a list of all monitored channels.
+Returns a list of all monitored channels with their current status.
+
+Response example:
+```json
+[
+    {
+        "link": "https://t.me/channel_name",
+        "title": "Channel Title",
+        "status": "connected"
+    }
+]
+```
 
 #### Add Channel
 ```http
-POST /api/channels
+POST /api/add_channel
 Content-Type: application/json
 
 {
-    "link": "https://t.me/channel_name",
-    "title": "Channel Title"
+    "link": "https://t.me/channel_name"
+}
+```
+
+Response example:
+```json
+{
+    "ok": true,
+    "status": "pending",
+    "message": "Channel added, connection in progress"
+}
+```
+
+#### Get Channel ID
+```http
+GET /api/channel_id/{link}
+```
+Returns channel information including its Telegram ID.
+
+Response example:
+```json
+{
+    "ok": true,
+    "channel_id": 123456789,
+    "username": "channel_name",
+    "title": "Channel Title",
+    "type": "channel"
 }
 ```
 
 #### Delete Channel
 ```http
 DELETE /api/channels/{link}
+```
+
+Response example:
+```json
+{
+    "ok": true
+}
 ```
 
 ### WebSocket Interface
@@ -109,12 +166,34 @@ Message format:
 }
 ```
 
+## Testing the API
+
+The repository includes a test script (`test_api.sh`) that demonstrates the usage of all API endpoints. To run the tests:
+
+1. Make sure the service is running
+2. Make the test script executable:
+```bash
+chmod +x test_api.sh
+```
+3. Run the tests:
+```bash
+./test_api.sh
+```
+
+The test script includes:
+- Getting the list of channels
+- Adding a new channel
+- Getting channel ID
+- Deleting a channel
+- Testing rate limiting
+
 ## Rate Limiting
 
 The service implements rate limiting to prevent abuse:
 - Window: 60 seconds
 - Maximum requests: 100 per window
 - Rate limit headers are included in responses
+- Returns 429 status code when limit is exceeded
 
 ## Security Considerations
 
@@ -122,6 +201,7 @@ The service implements rate limiting to prevent abuse:
 2. The service uses CORS middleware (configured for development)
 3. Rate limiting is enabled by default
 4. WebSocket connections are validated
+5. All API endpoints are protected by rate limiting
 
 ## Development
 
@@ -133,11 +213,16 @@ telegram_fetcher/
 ├── jsondb_api.py     # REST API implementation
 ├── tg_client_pool.py # Telegram client management
 ├── tg_config.py      # Configuration and credentials
+├── test_api.sh       # API testing script
 └── tests/            # Test suite
 ```
 
 ### Running Tests
 ```bash
+# Run API tests
+./test_api.sh
+
+# Run unit tests
 pytest telegram_fetcher/tests/
 ```
 
