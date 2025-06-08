@@ -105,7 +105,7 @@ def create_app(domain: str, redis_host: str = "localhost", redis_port: int = 637
     )
     redis_service = RedisService(redis_client, domain)
 
-    moex_stock_analyzer = MoexStockAnalyzer(['IMOEX'])
+    moex_stock_analyzer = MoexStockAnalyzer([])
     
     # Передаем схему аутентификации при создании зависимости
     get_current_user = redis_service.get_current_user_dependency(api_key_scheme)
