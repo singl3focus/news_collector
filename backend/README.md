@@ -33,7 +33,7 @@ docker run --name redis -d -p 6379:6379 redis
 
 Пример запроса:
 ```bash
-curl -X POST -d "username=alice" http://localhost:9080/register
+curl -X POST "http://localhost:9080/register?username=alice"
 ```
 
 Успешный ответ (200 OK):
@@ -55,7 +55,7 @@ curl -X POST -d "username=alice" http://localhost:9080/register
 
 Пример запроса:
 ```bash
-curl -X POST -d "username=alice" http://localhost:9080/login
+curl -X POST "http://localhost:9080/login?username=alice"
 ```
 
 Успешный ответ (200 OK):
@@ -79,7 +79,7 @@ curl -X POST -d "username=alice" http://localhost:9080/login
 Пример запроса:
 
 ```bash
-curl -X POST -H "Authorization: kL8sZ...qW2" -d "channel_id=123" http://localhost:9080/users/me/channels
+curl -X POST -H "Authorization: kL8sZ...qW2" "http://localhost:9080/users/me/channels?channel_id=123"
 ```
 
 Успешный ответ (200 OK):

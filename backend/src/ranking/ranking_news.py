@@ -1,3 +1,4 @@
+import re
 from . import analysis_text
 from .analysis_stock_market import MoexStockAnalyzer
 from datetime import datetime, timedelta
@@ -19,6 +20,11 @@ class Post:
     channel_title: str
     timestamp: int = 0
 
+def clean_text(text):
+    pattern = r"[^\w\s.,!?;:\-()\"'’“”«»—]"
+    cleaned_text = re.sub(pattern, '', text, flags=re.UNICODE)
+    return cleaned_text
+
 def is_good_news(post, change_stock=0.01) -> Tuple[bool, Optional[Post]]:
     global start_stack_embs, stack_embs
 
@@ -26,7 +32,9 @@ def is_good_news(post, change_stock=0.01) -> Tuple[bool, Optional[Post]]:
         stack_embs.clear()
         start_stack_embs = datetime.now()  # Обновляем время сброса
 
-    emb, tonality = analysis_text.get_info_text(post.text)
+    text = clean_text(post.text)
+
+    emb, tonality = analysis_text.get_info_text(text)
 
     if analysis_text.check_equality_emb(emb, stack_embs):
         return False, None 
@@ -52,5 +60,5 @@ def is_good_news(post, change_stock=0.01) -> Tuple[bool, Optional[Post]]:
         
     stack_embs.append(emb)
 
-    return True, Post(text=post.text,
+    return True, Post(text=text,
                           tonality=tonality, trend=trend, volatility=volatility, channel_id=post.channel_id, channel_title=post.channel_title, timestamp=post.timestamp)

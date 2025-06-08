@@ -89,19 +89,16 @@ class MoexStockAnalyzer:
         
         return pd.DataFrame(results)
     
-    def plot_separate_charts(self, minutes_back=60, interval=10):
-        num_plots = len(self.tickers)
-        fig, axes = plt.subplots(num_plots, 1, figsize=(14, 4.5 * num_plots), squeeze=False)
+    def plot_separate_charts(self, ticker, minutes_back=60, interval=10):
+        fig, axes = plt.subplots(1, 1, figsize=(14, 4.5), squeeze=False)
         axes = axes.flatten()
 
-        for idx, ticker in enumerate(self.tickers):
-            ax = axes[idx]
-            df = self.get_candles(ticker, interval, minutes_back)
+        ax = axes[0]
+        df = self.get_candles(ticker, interval, minutes_back)
 
-            if df is None or df.empty or 'close' not in df.columns or 'begin' not in df.columns:
-                ax.set_title(f"{ticker} — данные недоступны")
-                continue
-
+        if df is None or df.empty or 'close' not in df.columns or 'begin' not in df.columns:
+            ax.set_title(f"{ticker} — данные недоступны")
+        else:
             try:           
                 df = df.copy()
                 df['begin'] = pd.to_datetime(df['begin'], errors='coerce')
@@ -148,5 +145,5 @@ class MoexStockAnalyzer:
         buf = io.BytesIO()
         plt.savefig(buf, format='png')
         buf.seek(0)
-        im = Image.open(buf)
-        return im
+        # im = Image.open(buf)
+        return buf
