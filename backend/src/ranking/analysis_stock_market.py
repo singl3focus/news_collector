@@ -150,8 +150,3 @@ class MoexStockAnalyzer:
         buf.seek(0)
         im = Image.open(buf)
         return im
-
-
-moex_stock_analyzer = MoexStockAnalyzer()
-print(moex_stock_analyzer.analyze_stocks())
-moex_stock_analyzer.plot_separate_charts(minutes_back=3600).show()

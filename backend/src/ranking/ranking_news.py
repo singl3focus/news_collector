@@ -33,8 +33,8 @@ def is_good_news(post, change_stock=0.01) -> {bool, Post | None}:
     if not analysis_stock:
         return False, None 
     
-    if max(analysis_stock['change']) - min(analysis_stock['change']) < change_stock or tonality["label"] == "NEUTRAL":
-        return False, None
+    # if max(analysis_stock['change']) - min(analysis_stock['change']) < change_stock or tonality["label"] == "NEUTRAL":
+    #     return False, None
 
     if tonality["label"] == "POSITIVE":
         tonality = 1
