@@ -104,6 +104,7 @@ class TgClientWorker:
                     "channel_id": ch.id,
                     "channel_title": getattr(ch, "title", ""),
                     "text": event.message.raw_text,
+                    "channel_url": f"https://t.me/{getattr(ch, 'username', '')}"
                 }
                 await self.queue.put(msg)
         except Exception as e:
