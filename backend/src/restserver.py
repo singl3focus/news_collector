@@ -105,7 +105,7 @@ def create_app(domain: str, redis_host: str = "localhost", redis_port: int = 637
     )
     redis_service = RedisService(redis_client, domain)
 
-    moex_stock_analyzer = MoexStockAnalyzer(['IMOEX'])
+    moex_stock_analyzer = MoexStockAnalyzer([])
     
     # Передаем схему аутентификации при создании зависимости
     get_current_user = redis_service.get_current_user_dependency(api_key_scheme)
@@ -148,7 +148,7 @@ def create_app(domain: str, redis_host: str = "localhost", redis_port: int = 637
     
     @app.get("/get_moex_graph")
     def get_moex_graph(minutes_back: int=60, interval: int=10):
-        buf = moex_stock_analyzer.plot_separate_charts('IMOEX', minutes_back=minutes_back, interval=interval)
+        buf = moex_stock_analyzer.plot_separate_charts('MOEX', minutes_back=minutes_back, interval=interval)
         return Response(
             content=buf.getvalue(),
             media_type="image/png",
