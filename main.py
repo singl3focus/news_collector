@@ -7,15 +7,20 @@ from telegram.ext import (
     ContextTypes, filters
 )
 from websocket import WebSocketApp
-import requests;
+import requests
+from datetime import datetime
+
 
 user_socket_connections = {}
 user_socket_stop_flags = {}
 user_state = {}
 user_tickers = {}
 user_sources = {}
+userToken = "IGhG2bDGJTxRAAImJNvPVMj_mZpc-Pfz7rrDASV-Nnc"
 
 TOKEN = "7603471934:AAGHOqMsthzpCsoxuY1zm2Uy0UqiGELIr5I"  # 🔒 Замени на свой токен
+
+GlobalUrl = "4qzirm-31-131-157-99.ru.tuna.am"
 
 # Главное меню
 async def show_main_menu(update: Update):
@@ -40,9 +45,30 @@ async def show_settings_menu(update: Update):
 # Команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await show_main_menu(update)
-    url = f'http://192.168.52.12/9080?username={update.message.from_user.username}'
-    response = await requests.post(url)
-    print(response)
+    url = f'https://{GlobalUrl}/register?username={update.message.from_user.username}'
+    response = requests.post(url)
+    print(response.text)
+    # tmp = json.loads(response.text)
+    # userToken = tmp["token"]
+
+def format_news(message: dict) -> str:
+    tone_map = {1: "📈 <b>Позитив</b>", 0: "⚖️ <b>Нейтрально</b>", -1: "📉 <b>Негатив</b>"}
+    trend_map = {1: "📊 <u>Тренд ↑</u>", 0: "⏸ <u>Без тренда</u>", -1: "📉 <u>Тренд ↓</u>"}
+    volatility_map = {1: "🌪 <i>Высокая волатильность</i>", -1: "📏 <i>Низкая волатильность</i>"}
+
+    tone = tone_map.get(message.get("tonality", -1), "❓ Неизвестно")
+    trend = trend_map.get(message.get("trend", 0), "❓ Неизвестно")
+    volatility = volatility_map.get(message.get("volatility", 0), "❓ Неизвестно")
+
+    timestamp = message.get("timestamp")
+    time_str = datetime.fromtimestamp(timestamp).strftime("%d.%m.%Y %H:%M")
+
+    return (
+        f"📰 <b>{message['channel_title']}</b>\n\n"
+        f"<b>Новость:</b>\n<blockquote>{message['text']}</blockquote>\n"
+        f"<b>Дата:</b> <code>{time_str}</code>\n\n"
+        f"{tone} | {trend} | {volatility}"
+    )
 
 # Обработка сообщений
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -63,6 +89,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sources = [s.strip() for s in text.split(",") if s.strip()]
         user_sources[user_id] = sources
         user_state.pop(user_id)
+        for s in text.split(","):
+            url = f'https://{GlobalUrl}/users/me/channels?channel_name={s}'
+            headers = {
+                'Authorization': userToken,
+                'Content-Type': 'application/json'
+            }
+            response = requests.post(url, headers=headers)
+            print(response)
+
         await update.message.reply_text(f"✅ Источники сохранены: {', '.join(sources)}")
         await show_main_menu(update)
         return
@@ -133,14 +168,17 @@ def start_socket_stream(user_id, bot, loop):
     stop_flag = threading.Event()
     user_socket_stop_flags[user_id] = stop_flag
 
+    def on_open(ws):
+        ws.send(json.dumps({"token": userToken}))
+
     def on_message(ws, message):
-        print(message)
         tmp = json.loads(message)
         if stop_flag.is_set():
             ws.close()
             return
+        
         asyncio.run_coroutine_threadsafe(
-            bot.send_message(chat_id=user_id, text=f"🆕 Новость: {tmp['text']}"),
+            bot.send_message(chat_id=user_id, text=format_news(tmp), parse_mode="HTML"),
             loop
         )
 
@@ -152,10 +190,11 @@ def start_socket_stream(user_id, bot, loop):
 
     def run_socket():
         ws = WebSocketApp(
-            "ws://192.168.52.12:9999",
+            f"wss://udlhlm-31-131-157-99.ru.tuna.am",
             on_message=on_message,
             on_error=on_error,
-            on_close=on_close
+            on_close=on_close,
+            on_open=on_open
         )
         ws.run_forever()
 
