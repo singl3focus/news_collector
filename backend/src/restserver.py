@@ -3,10 +3,15 @@ from fastapi.security import APIKeyHeader
 import redis
 import secrets
 import json
+import os
 import requests
 import logging
+from dotenv import load_dotenv
 from typing import Optional, Dict, List
 from .ranking.analysis_stock_market import MoexStockAnalyzer
+from .ranking.suggest import OrionGPTClient, make_suggest
+
+load_dotenv()  
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +111,11 @@ def create_app(domain: str, redis_host: str = "localhost", redis_port: int = 637
     redis_service = RedisService(redis_client, domain)
 
     moex_stock_analyzer = MoexStockAnalyzer([])
+    client = OrionGPTClient(
+        operating_system_code=12,
+        api_key=os.getenv("API_KEY"),
+        user_domain_name=os.getenv("Teamd6DaHzYeNnh1")
+    )
     
     # Передаем схему аутентификации при создании зависимости
     get_current_user = redis_service.get_current_user_dependency(api_key_scheme)
@@ -175,6 +185,13 @@ def create_app(domain: str, redis_host: str = "localhost", redis_port: int = 637
                 status_code=500,
                 detail=f"Chart generation failed: {str(e)}"
             )
+    
+    @app.get("/summary")
+    def summary(minutes_back: int=60, interval: int=10, user_id: str = Depends(get_current_user)):
+        texts = ...
+        candles = moex_stock_analyzer.get_candles('MOEX', interval=interval, minutes_back=minutes_back)
+        summary = make_suggest(client, texts, candles)
+        return {"status": "ready", "summary": summary}
 
     return app
 
