@@ -83,7 +83,7 @@ class MoexStockAnalyzer:
                 if result['price_range'] > data[fields['open']] * 0.01:
                     result['volatility'] = 1
                 else:
-                    result['volatility'] = 0
+                    result['volatility'] = -1
                     
                 results.append(result)
             except IndexError as e:
