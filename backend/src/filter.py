@@ -37,9 +37,6 @@ class NewsPost:
     simhash: int = 0
 
     def __post_init__(self):
-        if self.channel_url == "":
-            self.channel_url = "https://t.me"
-
         try:
             dt = datetime.fromisoformat(self.raw_timestamp.replace("Z", "+00:00"))
             self.timestamp = int(dt.timestamp())

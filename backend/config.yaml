@@ -1,6 +1,6 @@
 network:
   collector_uri: "ws://10.10.174.2:8001/ws"
-  collector_http: "http://10.10.174.2:8001"
+  collector_http: "10.10.174.2:8001"
   wsserver:
     host: "0.0.0.0"
     port: 9999
