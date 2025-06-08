@@ -10,7 +10,9 @@ def setup_redis(host: str, port: int) -> redis.Redis:
         host=host,
         port=port,
         decode_responses=True,
-        health_check_interval=30
+        health_check_interval=30,
+        retry_on_timeout=True,
+        socket_keepalive=True
     )
     while True:
         try:

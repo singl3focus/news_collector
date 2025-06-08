@@ -29,12 +29,13 @@ def setup_logging() -> None:
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
     # Файловый обработчик
-    file_handler = logging.FileHandler(cfg.logger.log_file)
+    file_handler = logging.FileHandler(cfg.logger.log_file, encoding='utf-8')
     file_handler.setFormatter(formatter)
 
-    # Консольный обработчик
+    # Консольный обработчик с обработкой ошибок
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
+    console_handler.encoder = lambda s: s.encode('utf-8', 'replace')  # Добавлено
 
     # Очистка старых обработчиков
     for handler in root_logger.handlers[:]:
@@ -78,8 +79,8 @@ async def main_async():
     ws_server = wsserver.WSServer(
         event_bus,
         r,
-        host=cfg.network.server_host,
-        port=cfg.network.server_port
+        host=cfg.network.wsserver.host,
+        port=cfg.network.wsserver.port
     )
     event_bus.subscribe(EVENT_FULL_POST, ws_server.process_event)
     ws_server.start()
@@ -92,17 +93,40 @@ async def main_async():
 
     # Бесконечный цикл для поддержания работы приложения
     while True:
-        await asyncio.sleep(3600)  # Не блокирующее ожидание
+        try:
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            logger.info("Application shutting down")
+            break
+        except Exception as e:
+            logger.exception("Unexpected error in main loop")
 
 
 def main():
-    asyncio.run(main_async())
+    try:
+        asyncio.run(main_async())
+    except Exception as e:
+        logger.exception("Application crashed")
+        return 1
+    return 0
 
 
 def tonal_callback(data: filter.NewsPost, pubsub: PubSub) -> None:
     logger.info(f"[tonal] Get post: {data}")
 
-    good, new_data = ranking_news.is_good_news(data)
+    # good, new_data = ranking_news.is_good_news(data)
+    
+    good = True
+    new_data = ranking_news.Post(
+        text=data.text,
+        tonality=-1, # 1 - good, -1 - bad
+        trend=-1, # 1 - up, -1 - down
+        volatility=-1, # 1 - high, -1 - low
+        channel_id=data.channel_id,
+        channel_title=data.channel_title,
+        timestamp=data.timestamp
+    )
+
     if good and new_data is not None:
         pubsub.publish(EVENT_FILTERED_POST, new_data)
 

@@ -7,10 +7,7 @@ from typing import Optional, Dict, List
 
 KEY_ID = "id"
 KEY_USERNAME = "username"
-KEY_TOKENS = "tokens"  # Исправлена опечатка (TOCKENS -> TOKENS)
-
-app = FastAPI()
-api_key_scheme = APIKeyHeader(name="Authorization")
+KEY_TOKENS = "tokens"
 
 class RedisService:
     def __init__(self, redis_client: redis.Redis):
@@ -26,10 +23,9 @@ class RedisService:
             KEY_TOKENS: [token]
         }
         
-        # Сохраняем в Redis
         self.redis.set(f"user:{user_id}", json.dumps(user_data))
         self.redis.set(f"auth:token:{token}", user_id)
-        self.redis.sadd(f"user:channels:{user_id}", 0)  # Дефолтная подписка
+        self.redis.sadd(f"user:channels:{user_id}", 0)
         
         return {"user_id": user_id, "token": token}
 
@@ -48,7 +44,7 @@ class RedisService:
                 return token
         return None
 
-    def get_current_user_dependency(self):
+    def get_current_user_dependency(self, api_key_scheme: APIKeyHeader):  # Принимаем схему как аргумент
         def _get_current_user(token: str = Depends(api_key_scheme)) -> str:
             user_id = self.redis.get(f"auth:token:{token}")
             if not user_id:
@@ -62,32 +58,46 @@ class RedisService:
     def remove_channel(self, user_id: str, channel_id: int):
         self.redis.srem(f"user:channels:{user_id}", channel_id)
 
-# Инициализация Redis клиента и сервиса
-redis_client = redis.Redis(host="localhost", port=6379, decode_responses=True)
-redis_service = RedisService(redis_client)
-get_current_user = redis_service.get_current_user_dependency()
+def create_app(redis_host: str = "localhost", redis_port: int = 6379):
+    app = FastAPI()
+    
+    # Создаем схему аутентификации
+    api_key_scheme = APIKeyHeader(name="Authorization")
+    
+    # Инициализация Redis
+    redis_client = redis.Redis(
+        host=redis_host,
+        port=redis_port,
+        decode_responses=True
+    )
+    redis_service = RedisService(redis_client)
+    
+    # Передаем схему аутентификации при создании зависимости
+    get_current_user = redis_service.get_current_user_dependency(api_key_scheme)
+    
+    @app.post("/register")
+    def register(username: str):
+        try:
+            user_data = redis_service.create_user(username)
+            return {"status": "success", "token": user_data["token"]}
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/register")
-def register(username: str):
-    try:
-        user_data = redis_service.create_user(username)
-        return {"status": "success", "token": user_data["token"]}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    @app.post("/login")
+    def login(username: str):
+        token = redis_service.authenticate(username)
+        if not token:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        return {"status": "success", "token": token}
 
-@app.post("/login")
-def login(username: str):
-    token = redis_service.authenticate(username)
-    if not token:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    return {"status": "success", "token": token}
+    @app.post("/users/{user_id}/channels")
+    def add_channel(channel_id: int, user_id: str = Depends(get_current_user)):
+        redis_service.add_channel(user_id, channel_id)
+        return {"status": "added", "channel_id": channel_id}
 
-@app.post("/users/{user_id}/channels")
-def add_channel(channel_id: int, user_id: str = Depends(get_current_user)):
-    redis_service.add_channel(user_id, channel_id)
-    return {"status": "added", "channel_id": channel_id}
+    @app.delete("/users/{user_id}/channels/{channel_id}")
+    def remove_channel(channel_id: int, user_id: str = Depends(get_current_user)):
+        redis_service.remove_channel(user_id, channel_id)
+        return {"status": "removed", "channel_id": channel_id}
 
-@app.delete("/users/{user_id}/channels/{channel_id}")
-def remove_channel(channel_id: int, user_id: str = Depends(get_current_user)):
-    redis_service.remove_channel(user_id, channel_id)
-    return {"status": "removed", "channel_id": channel_id}
+    return app

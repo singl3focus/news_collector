@@ -1,3 +1,4 @@
+import asyncio
 import websockets
 import json
 import re
@@ -133,4 +134,7 @@ async def receive_posts(uri: str, pubsub: PubSub):
             logger.warning("Connection closed")
         except Exception as e:
             logger.exception(f"Critical error: {e}")
+
+            await asyncio.sleep(5)
+            await receive_posts(uri, pubsub)
             
