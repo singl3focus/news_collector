@@ -1,4 +1,5 @@
 import asyncio
+import json
 import threading
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
@@ -129,11 +130,13 @@ def start_socket_stream(user_id, bot, loop):
     user_socket_stop_flags[user_id] = stop_flag
 
     def on_message(ws, message):
+        print(message)
+        tmp = json.loads(message)
         if stop_flag.is_set():
             ws.close()
             return
         asyncio.run_coroutine_threadsafe(
-            bot.send_message(chat_id=user_id, text=f"🆕 Новость: {message}"),
+            bot.send_message(chat_id=user_id, text=f"🆕 Новость: {tmp['text']}"),
             loop
         )
 
@@ -145,7 +148,7 @@ def start_socket_stream(user_id, bot, loop):
 
     def run_socket():
         ws = WebSocketApp(
-            "ws://localhost:8765",
+            "ws://172.20.10.2:9999",
             on_message=on_message,
             on_error=on_error,
             on_close=on_close
