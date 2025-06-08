@@ -7,6 +7,7 @@ from telegram.ext import (
     ContextTypes, filters
 )
 from websocket import WebSocketApp
+import requests;
 
 user_socket_connections = {}
 user_socket_stop_flags = {}
@@ -39,6 +40,9 @@ async def show_settings_menu(update: Update):
 # Команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await show_main_menu(update)
+    url = f'http://192.168.52.12/9080?username={update.message.from_user.username}'
+    response = await requests.post(url)
+    print(response)
 
 # Обработка сообщений
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -148,7 +152,7 @@ def start_socket_stream(user_id, bot, loop):
 
     def run_socket():
         ws = WebSocketApp(
-            "ws://172.20.10.2:9999",
+            "ws://192.168.52.12:9999",
             on_message=on_message,
             on_error=on_error,
             on_close=on_close
