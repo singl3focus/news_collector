@@ -70,7 +70,7 @@ async def main_async():
     cfg = config.parse_config(CONFIG_FILE)
     r = redis_init.setup_redis(cfg.database.host, cfg.database.port)
     event_bus = PubSub()
-
+    
     # Регистрация подписок ДО запуска обработки сообщений
     event_bus.subscribe(EVENT_NEW_POST, lambda data: tonal_callback(data, event_bus))
     event_bus.subscribe(EVENT_FILTERED_POST, lambda data: rank_callback(data, event_bus))
