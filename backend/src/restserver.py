@@ -146,14 +146,35 @@ def create_app(domain: str, redis_host: str = "localhost", redis_port: int = 637
         redis_service.remove_all_channels(user_id)
         return {"status": "all channels removed"}
     
-    @app.get("/get_moex_graph")
-    def get_moex_graph(minutes_back: int=60, interval: int=10):
-        buf = moex_stock_analyzer.plot_separate_charts('IMOEX', minutes_back=minutes_back, interval=interval)
-        return Response(
-            content=buf.getvalue(),
-            media_type="image/png",
-            headers={"Content-Disposition": "inline; filename=moex_chart.png"}
-        )
+    @app.get("/graph/index")
+    def get_index_graph(ticker: str, minutes_back: int = 300, interval: int = 10):
+        allows = ['IMOEX', 'RTSI', 'MOEX10', 'MOEXBMI', 'RTSSTD', 'MCFTR', 'RGBITR']
+        if ticker not in allows:
+            raise HTTPException(status_code=404, detail="Index not available")
+
+        try:
+            # Ограничение максимальной глубины
+            minutes_back = min(minutes_back, 10000)  
+            
+            # Корректировка интервала
+            if interval not in [1, 5, 10, 15, 30, 60]:
+                interval = 10
+
+            buf = moex_stock_analyzer.plot_separate_charts(
+                ticker, 
+                minutes_back=minutes_back,
+                interval=interval
+            )
+            return Response(
+                content=buf.getvalue(),
+                media_type="image/png",
+                headers={"Content-Disposition": f"inline; filename={ticker}_chart.png"}
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Chart generation failed: {str(e)}"
+            )
 
     return app
 

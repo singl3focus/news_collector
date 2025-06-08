@@ -16,16 +16,6 @@ DEDUP_WINDOW_SIZE = 100
 SIMHASH_DISTANCE = 10
 
 
-"""
-{
-    "timestamp": "2024-03-14T12:00:00Z",
-    "channel_id": 123456789,
-    "channel_title": "Channel Name",
-    "text": "Message content"
-}
-"""
-
-
 @dataclass
 class NewsPost:
     text: str
@@ -102,11 +92,10 @@ async def receive_posts(uri: str, pubsub: PubSub):
                         continue
 
                     # Проверка обязательных полей
-                    required = ["text", "timestamp", "channel_id"]
+                    required = ["text", "timestamp", "channel_url", "channel_title"]
                     if not all(k in data for k in required):
                         logger.warning(f"Missing fields in: {message[:100]}...")
                         continue
-
 
                     post = NewsPost(
                         text=data["text"],
