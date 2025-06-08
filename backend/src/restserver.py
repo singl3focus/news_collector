@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Response
 from fastapi.security import APIKeyHeader
 import redis
 import secrets
@@ -6,6 +6,7 @@ import json
 import requests
 import logging
 from typing import Optional, Dict, List
+from .ranking.analysis_stock_market import MoexStockAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +104,8 @@ def create_app(domain: str, redis_host: str = "localhost", redis_port: int = 637
         decode_responses=True
     )
     redis_service = RedisService(redis_client, domain)
+
+    moex_stock_analyzer = MoexStockAnalyzer(['IMOEX'])
     
     # Передаем схему аутентификации при создании зависимости
     get_current_user = redis_service.get_current_user_dependency(api_key_scheme)
@@ -142,6 +145,15 @@ def create_app(domain: str, redis_host: str = "localhost", redis_port: int = 637
     def remove_all_channels(user_id: str = Depends(get_current_user)):
         redis_service.remove_all_channels(user_id)
         return {"status": "all channels removed"}
+    
+    @app.get("/get_moex_graph")
+    def get_moex_graph(minutes_back: int=60, interval: int=10):
+        buf = moex_stock_analyzer.plot_separate_charts('IMOEX', minutes_back=minutes_back, interval=interval)
+        return Response(
+            content=buf.getvalue(),
+            media_type="image/png",
+            headers={"Content-Disposition": "inline; filename=moex_chart.png"}
+        )
 
     return app
 

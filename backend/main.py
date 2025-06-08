@@ -114,19 +114,7 @@ def main():
 def tonal_callback(data: filter.NewsPost, pubsub: PubSub) -> None:
     logger.info(f"[tonal] Get post: {data}")
 
-    # good, new_data = ranking_news.is_good_news(data)
-    
-    good = True
-    new_data = ranking_news.Post(
-        text=data.text,
-        tonality=-1, # 1 - good, -1 - bad
-        trend=-1, # 1 - up, -1 - down
-        volatility=-1, # 1 - high, -1 - low
-        channel_id=data.channel_id,
-        channel_title=data.channel_title,
-        channel_url=data.channel_url,
-        timestamp=data.timestamp
-    )
+    good, new_data = ranking_news.is_good_news(data)
 
     if good and new_data is not None:
         pubsub.publish(EVENT_FILTERED_POST, new_data)

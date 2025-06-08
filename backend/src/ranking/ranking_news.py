@@ -63,4 +63,4 @@ def is_good_news(post, change_stock=0.01) -> Tuple[bool, Optional[Post]]:
     stack_embs.append(emb)
 
     return True, Post(text=text,
-                          tonality=tonality, trend=trend, volatility=volatility, channel_id=post.channel_id, channel_title=post.channel_title, timestamp=post.timestamp)
+                          tonality=tonality, trend=trend, volatility=volatility, channel_id=post.channel_id, channel_url=post.channel_url, channel_title=post.channel_title, timestamp=post.timestamp)
