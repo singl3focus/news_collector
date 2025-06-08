@@ -1,8 +1,9 @@
 import asyncio
+import uuid
 import websockets
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from collections import deque
 from simhash import Simhash, SimhashIndex
@@ -23,6 +24,7 @@ class NewsPost:
     channel_id: str
     channel_title: str
     channel_url: str
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: int = 0
     simhash: int = 0
 

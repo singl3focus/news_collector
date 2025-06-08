@@ -1,3 +1,4 @@
+from datetime import time
 from fastapi import FastAPI, Depends, HTTPException, Response
 from fastapi.security import APIKeyHeader
 import redis
@@ -95,6 +96,21 @@ class RedisService:
             return response.json().get("ok", False)
         except Exception:
             return 
+        
+    def get_viewed_posts(self, user_id: str) -> list:
+        """Получение просмотренных постов за последние 24 часа"""
+        key = f"user:viewed:{user_id}"
+        if not self.redis.exists(key):
+            return []
+
+        # Удаляем записи старше 24 часов
+        cutoff = time.time() - 24 * 3600
+        self.redis.zremrangebyscore(key, 0, cutoff)
+        
+        # Получаем актуальные ID постов
+        post_ids = self.redis.zrange(key, 0, -1)
+        return post_ids or []    
+
 
 def create_app(domain: str, redis_host: str = "localhost", redis_port: int = 6379):
     app = FastAPI()
@@ -188,9 +204,35 @@ def create_app(domain: str, redis_host: str = "localhost", redis_port: int = 637
     
     @app.get("/summary")
     def summary(minutes_back: int=60, interval: int=10, user_id: str = Depends(get_current_user)):
-        texts = ...
-        candles = moex_stock_analyzer.get_candles('MOEX', interval=interval, minutes_back=minutes_back)
-        summary = make_suggest(client, texts, candles)
+        post_ids = redis_service.get_viewed_posts(user_id)
+        if not post_ids:
+            return {"status": "no_viewed_posts"}
+        
+        texts = []
+        with redis_service.redis.pipeline() as pipe:
+            for post_id in post_ids:
+                pipe.get(f"post:{post_id}")
+            post_data_list = pipe.execute()
+        
+        for data in post_data_list:
+            if data:
+                try:
+                    post = json.loads(data)  # Десериализация JSON
+                    texts.append(post.get("text", ""))
+                except json.JSONDecodeError:
+                    continue
+        
+        combined_text = "\n".join(filter(None, texts))
+        
+        try:
+            candles = moex_stock_analyzer.get_candles('MOEX', 
+                interval=interval, 
+                minutes_back=minutes_back)
+            summary = make_suggest(client, combined_text, candles)
+        except Exception as e:
+            logger.error(f"Summary generation failed: {str(e)}")
+            raise HTTPException(status_code=500, detail="Summary generation error")
+        
         return {"status": "ready", "summary": summary}
 
     return app

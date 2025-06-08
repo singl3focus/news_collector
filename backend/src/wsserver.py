@@ -1,4 +1,5 @@
 import asyncio
+from datetime import time
 import json
 import uuid
 import websockets
@@ -58,31 +59,65 @@ class WSServer:
                 if websocket in self.clients:
                     del self.clients[websocket]
 
-    async def broadcast_to_subscribers(self, post: NewsPost):
-        """Отправка только подписанным клиентам"""
+    async def broadcast_to_subscribers(self, post):
+        """Отправка поста с отслеживанием просмотров"""
         with self.clients_lock:
             if not self.clients:
                 return
 
             tasks = []
             for websocket, client_info in self.clients.items():
-                # Проверка подписки на канал
                 if post.channel_id in client_info["channels"]:
                     try:
                         message = json.dumps(post.__dict__)
-                        tasks.append(websocket.send(message))
+                        task = asyncio.create_task(websocket.send(message))
+                        # Прикрепляем информацию для отслеживания
+                        task.client_info = client_info
+                        task.post_id = post.id
+                        task.websocket = websocket
+                        tasks.append(task)
                     except Exception as e:
                         logger.error(f"Send error: {e}")
-                        # Удаляем отключенного клиента
                         del self.clients[websocket]
             
             if tasks:
-                await asyncio.gather(*tasks)
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                for i, result in enumerate(results):
+                    task = tasks[i]
+                    if not isinstance(result, Exception):
+                        # Успешная отправка = просмотр
+                        await self.add_viewed_post(
+                            task.client_info["user_id"],
+                            task.post_id
+                        )
+                    else:
+                        # Обработка ошибок отправки
+                        with self.clients_lock:
+                            if task.websocket in self.clients:
+                                del self.clients[task.websocket]
 
-    def process_event(self, post: NewsPost):
+    async def add_viewed_post(self, user_id: str, post_id: str):
+        """Добавление просмотра в Redis (асинхронно)"""
+        loop = asyncio.get_running_loop()
+        def _add():
+            key = f"user:viewed:{user_id}"
+            timestamp = time.time()
+            with self.redis.pipeline() as pipe:
+                # Добавляем пост с временной меткой
+                pipe.zadd(key, {post_id: timestamp})
+                # Устанавливаем TTL 48 часов для ключа
+                pipe.expire(key, 48 * 3600)
+                pipe.execute()
+        await loop.run_in_executor(None, _add)
+
+    def process_event(self, post):
         """Обработка нового поста (вызывается из основного потока)"""
-        # Сохранение в Redis
-        self.redis.setex(f"post:{uuid.uuid4()}", 86400, json.dumps(post.__dict__))
+        # Сохранение с использованием ID поста
+        self.redis.setex(
+            f"post:{post.id}",
+            86400,  # 24 часа TTL
+            json.dumps(post.__dict__)
+        )
         
         # Отправка подписчикам
         if self.loop:

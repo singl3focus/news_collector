@@ -2,7 +2,6 @@ import requests
 import time
 import random
 from typing import Optional, Dict, Any
-from analysis_stock_market import MoexStockAnalyzer
 
 
 class OrionGPTClient:
