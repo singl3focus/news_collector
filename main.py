@@ -20,13 +20,14 @@ userToken = "IGhG2bDGJTxRAAImJNvPVMj_mZpc-Pfz7rrDASV-Nnc"
 
 TOKEN = "7603471934:AAGHOqMsthzpCsoxuY1zm2Uy0UqiGELIr5I"  # 🔒 Замени на свой токен
 
-GlobalUrl = "4qzirm-31-131-157-99.ru.tuna.am"
+GlobalUrl = "6yuwe0-31-131-157-99.ru.tuna.am"
+WebSocketUrl = "frslmh-31-131-157-99.ru.tuna.am"
 
 # Главное меню
 async def show_main_menu(update: Update):
     keyboard = [
         ["📊 Общее саммари по рынку", "🧠 Live новости"],
-        ["📋 Список тикеров", "📋 Список источников"],
+        [ "📋 Список источников"],
         ["⚙️ Настройки"]
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -35,8 +36,8 @@ async def show_main_menu(update: Update):
 # Меню настроек
 async def show_settings_menu(update: Update):
     keyboard = [
-        ["➕ Добавить тикеры", "🗞 Добавить источники"],
-        ["🧹 Очистить тикеры", "🧹 Очистить источники"],
+        [ "🗞 Добавить источники"],
+        [ "🧹 Очистить источники"],
         ["🔙 Назад"]
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -48,8 +49,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = f'https://{GlobalUrl}/register?username={update.message.from_user.username}'
     response = requests.post(url)
     print(response.text)
-    # tmp = json.loads(response.text)
-    # userToken = tmp["token"]
+    tmp = json.loads(response.text)
+    userToken = tmp["token"]
 
 def format_news(message: dict) -> str:
     tone_map = {1: "📈 <b>Позитив</b>", 0: "⚖️ <b>Нейтрально</b>", -1: "📉 <b>Негатив</b>"}
@@ -65,8 +66,8 @@ def format_news(message: dict) -> str:
 
     return (
         f"📰 <b>{message['channel_title']}</b>\n\n"
-        f"<b>Новость:</b>\n<blockquote>{message['text']}</blockquote>\n"
-        f"<b>Дата:</b> <code>{time_str}</code>\n\n"
+        f"<b>Новость:</b>\n<blockquote>{message['text']}</blockquote>\n\n"
+        f"<b>Источник: </b> <a>{message['channel_url']}</a>\n\n"
         f"{tone} | {trend} | {volatility}"
     )
 
@@ -84,13 +85,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ Тикеры сохранены: {', '.join(tickers)}")
         await show_main_menu(update)
         return
+    
+    if state == "awaiting_del_source":
+        tmp = text.split('/')[-1]
+        url = f'https://{GlobalUrl}/users/me/channels?channel_name={tmp}'
+        headers = {
+            'Authorization': userToken,
+            'Content-Type': 'application/json'
+        }
+        response = requests.delete(url, headers=headers)
+        print(response)
+        return
 
     elif state == "awaiting_sources":
         sources = [s.strip() for s in text.split(",") if s.strip()]
         user_sources[user_id] = sources
         user_state.pop(user_id)
         for s in text.split(","):
-            url = f'https://{GlobalUrl}/users/me/channels?channel_name={s}'
+            tmp = s.split('/')[-1]
+            print(tmp)
+            url = f'https://{GlobalUrl}/users/channels?channel_name={tmp}'
             headers = {
                 'Authorization': userToken,
                 'Content-Type': 'application/json'
@@ -118,12 +132,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🛑 Новости остановлены.")
         await show_main_menu(update)
 
-    elif text == "📋 Список тикеров":
-        tickers = user_tickers.get(user_id)
-        if tickers:
-            await update.message.reply_text(f"📋 Твои тикеры: {', '.join(tickers)}")
-        else:
-            await update.message.reply_text("📭 Список тикеров пуст.")
 
     elif text == "📋 Список источников":
         sources = user_sources.get(user_id)
@@ -136,25 +144,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "⚙️ Настройки":
         await show_settings_menu(update)
 
-    elif text == "➕ Добавить тикеры":
-        user_state[user_id] = "awaiting_tickers"
-        await update.message.reply_text("Введите тикеры через запятую (например: AAPL, TSLA, BTC):")
 
     elif text == "🗞 Добавить источники":
         user_state[user_id] = "awaiting_sources"
         await update.message.reply_text("Введите источники через запятую (например: https://t.me/example1, https://t.me/example2):")
 
-    elif text == "🧹 Очистить тикеры":
-        if user_id in user_tickers:
-            del user_tickers[user_id]
-            await update.message.reply_text("🧼 Тикеры очищены.")
-        else:
-            await update.message.reply_text("✅ У тебя ещё нет сохранённых тикеров.")
-        await show_settings_menu(update)
 
     elif text == "🧹 Очистить источники":
+        url = f'https://{GlobalUrl}/user/channels/all'
+        headers = {
+            'Authorization': userToken,
+            'Content-Type': 'application/json'
+        }
+        response = requests.delete(url, headers=headers)
+        print(response)
         if user_id in user_sources:
             del user_sources[user_id]
+            print("svdsvssdv")
+            
             await update.message.reply_text("🧼 Источники очищены.")
         else:
             await update.message.reply_text("✅ У тебя ещё нет сохранённых источников.")
@@ -190,7 +197,7 @@ def start_socket_stream(user_id, bot, loop):
 
     def run_socket():
         ws = WebSocketApp(
-            f"wss://udlhlm-31-131-157-99.ru.tuna.am",
+            f"wss://{WebSocketUrl}",
             on_message=on_message,
             on_error=on_error,
             on_close=on_close,
