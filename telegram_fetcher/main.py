@@ -97,13 +97,13 @@ async def delete_channel(link: str):
         logger.error(f"Error deleting channel: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-@app.get("/api/channel_id/{link}")
-async def get_channel_id(link: str):
+@app.get("/api/channel_id/{username}")
+async def get_channel_id(username: str):
     """
     Получает ID канала по его ссылке.
     
     Args:
-        link: Ссылка на канал в формате https://t.me/username или @username
+        username: Ссылка на канал в формате https://t.me/username или @username
         
     Returns:
         dict: Словарь с ID канала и дополнительной информацией
@@ -113,7 +113,6 @@ async def get_channel_id(link: str):
             raise HTTPException(status_code=503, detail="No Telegram clients available")
         
         # Извлекаем username из ссылки
-        username = link.split("/")[-1].replace("@", "")
         
         # Используем первый доступный клиент для получения информации
         worker = workers[0]
