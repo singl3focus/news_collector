@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  chroxy:
+    image: holsee/chroxy:latest
+    ports:
+      - "9222:9222"
+    environment:
+      - CHROXY_MAX_SESSIONS=10
+      - CHROXY_IDLE_TIMEOUT=300
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9222/json/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile.monitor
+    volumes:
+      - ./:/app
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - CHROXY_URL=http://chroxy:9222
+      - SOURCES_FILE=/app/sources.json
+    depends_on:
+      chroxy:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  websocket:
+    build:
+      context: .
+      dockerfile: Dockerfile.websocket
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/app
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+      - monitor
+
+volumes:
+  redis_data: 

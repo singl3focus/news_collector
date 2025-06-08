@@ -1,0 +1,29 @@
+{
+  "sources": [
+    {
+      "id": "rbc",
+      "type": "html",
+      "url": "https://www.rbc.ru/",
+      "selector": ".main__feed .item__link",
+      "title_selector": ".item__title",
+      "interval": 20,
+      "parser_module": null
+    },
+    {
+      "id": "lenta",
+      "type": "html",
+      "url": "https://lenta.ru/",
+      "selector": ".card-mini__title",
+      "title_selector": null,
+      "interval": 30,
+      "parser_module": null
+    },
+    {
+      "id": "vedomosti",
+      "type": "rss",
+      "url": "https://www.vedomosti.ru/rss/news",
+      "interval": 15,
+      "parser_module": null
+    }
+  ]
+} 

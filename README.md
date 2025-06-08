@@ -1,9 +1,19 @@
-# Telegram Fetcher Service
+# News Collector Platform
 
-A robust service for monitoring and collecting messages from Telegram channels. The service provides a REST API for channel management and a WebSocket interface for real-time message delivery.
+A comprehensive platform for collecting and monitoring news from multiple sources, including Telegram channels and news websites. The platform consists of two main services that work together to provide real-time news aggregation and delivery.
+
+## Overview
+
+The platform consists of two main services:
+
+1. **Telegram Fetcher Service**: Monitors and collects messages from Telegram channels
+2. **News Socket Proxy**: Monitors news websites and RSS feeds
+
+Both services provide real-time updates via WebSocket interfaces and can be used independently or together.
 
 ## Features
 
+### Telegram Fetcher Service
 - 📡 Real-time message collection from Telegram channels
 - 🔄 Automatic channel subscription management
 - 🌐 REST API for channel management
@@ -13,34 +23,48 @@ A robust service for monitoring and collecting messages from Telegram channels. 
 - 💾 Simple JSON-based channel storage
 - 🧪 Built-in API testing tools
 
+### News Socket Proxy
+- 📰 Monitor multiple news sources (HTML and RSS)
+- 🔄 Real-time updates via WebSocket
+- 🎯 Source-specific subscriptions
+- 🔍 Automatic deduplication of articles
+- 📈 Scalable architecture with Redis
+- 🐳 Docker-based deployment
+- 🌐 Headless Chrome support via chroxy
+
 ## Prerequisites
 
 - Python 3.10 or higher
-- Telegram API credentials (API ID and API Hash)
+- Docker and Docker Compose (for News Socket Proxy)
+- Telegram API credentials (for Telegram Fetcher)
+- Redis (for News Socket Proxy)
 - Virtual environment (recommended)
 - `jq` for JSON processing (for testing)
 
 ## Installation
 
-1. Clone the repository:
+### 1. Clone the Repository
 ```bash
 git clone <repository-url>
 cd news_collector
 ```
 
-2. Create and activate a virtual environment:
+### 2. Set Up Telegram Fetcher Service
+
+1. Create and activate a virtual environment:
 ```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-3. Install dependencies:
+2. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-4. Create a `.env` file in the project root with your Telegram API credentials:
+3. Create a `.env` file in the project root:
 ```env
+# Telegram API credentials
 API_ID_1=your_first_api_id
 API_HASH_1=your_first_api_hash
 SESSION_NAME_1=client1
@@ -52,51 +76,61 @@ SESSION_NAME_2=client2
 JSONDB_API_URL=http://localhost:8001/api/channels
 ```
 
-5. Install `jq` for JSON processing (required for testing):
-```bash
-# On macOS:
-brew install jq
+### 3. Set Up News Socket Proxy
 
-# On Ubuntu/Debian:
-sudo apt-get install jq
-
-# On Windows (with Chocolatey):
-choco install jq
+1. Create a `sites_fetcher/sources.json` file:
+```json
+{
+  "sources": [
+    {
+      "id": "rbc",
+      "type": "html",
+      "url": "https://www.rbc.ru/",
+      "selector": ".main__feed .item__link",
+      "title_selector": ".item__title",
+      "interval": 20
+    }
+  ]
+}
 ```
 
-## Running the Service
+2. Start the services using Docker Compose:
+```bash
+cd sites_fetcher
+docker-compose up -d
+```
 
-The service consists of two main components:
+## Running the Services
 
-1. REST API server (for channel management):
+### Telegram Fetcher Service
+
+1. Start the REST API server:
 ```bash
 uvicorn telegram_fetcher.main:app --host 0.0.0.0 --port 8001
 ```
 
-2. Telegram client workers and WebSocket server (automatically started with the main service)
+2. The Telegram client workers and WebSocket server will start automatically.
+
+### News Socket Proxy
+
+The service runs in Docker containers. To start:
+```bash
+cd sites_fetcher
+docker-compose up -d
+```
 
 ## API Documentation
 
-### REST API Endpoints
+### Telegram Fetcher API
 
-#### Get All Channels
+#### REST Endpoints
+
+1. **Get All Channels**
 ```http
 GET /api/channels
 ```
-Returns a list of all monitored channels with their current status.
 
-Response example:
-```json
-[
-    {
-        "link": "https://t.me/channel_name",
-        "title": "Channel Title",
-        "status": "connected"
-    }
-]
-```
-
-#### Add Channel
+2. **Add Channel**
 ```http
 POST /api/add_channel
 Content-Type: application/json
@@ -106,47 +140,17 @@ Content-Type: application/json
 }
 ```
 
-Response example:
-```json
-{
-    "ok": true,
-    "status": "pending",
-    "message": "Channel added, connection in progress"
-}
-```
-
-#### Get Channel ID
+3. **Get Channel ID**
 ```http
 GET /api/channel_id/{link}
 ```
-Returns channel information including its Telegram ID.
 
-Response example:
-```json
-{
-    "ok": true,
-    "channel_id": 123456789,
-    "username": "channel_name",
-    "title": "Channel Title",
-    "type": "channel"
-}
-```
-
-#### Delete Channel
+4. **Delete Channel**
 ```http
 DELETE /api/channels/{link}
 ```
 
-Response example:
-```json
-{
-    "ok": true
-}
-```
-
-### WebSocket Interface
-
-Connect to the WebSocket endpoint to receive real-time messages:
+#### WebSocket Interface
 ```javascript
 const ws = new WebSocket('ws://localhost:8001/ws');
 
@@ -156,7 +160,25 @@ ws.onmessage = (event) => {
 };
 ```
 
-Message format:
+### News Socket Proxy API
+
+#### WebSocket Interface
+```javascript
+// Connect to all sources
+const ws = new WebSocket('ws://localhost:8000/ws');
+
+// Or connect to a specific source
+const ws = new WebSocket('ws://localhost:8000/ws?source=rbc');
+
+ws.onmessage = (event) => {
+    const article = JSON.parse(event.data);
+    console.log('New article:', article);
+};
+```
+
+## Message Formats
+
+### Telegram Messages
 ```json
 {
     "timestamp": "2024-03-14T12:00:00Z",
@@ -166,65 +188,74 @@ Message format:
 }
 ```
 
-## Testing the API
-
-The repository includes a test script (`test_api.sh`) that demonstrates the usage of all API endpoints. To run the tests:
-
-1. Make sure the service is running
-2. Make the test script executable:
-```bash
-chmod +x test_api.sh
+### News Articles
+```json
+{
+    "event": "new_article",
+    "source": "rbc",
+    "title": "Article Title",
+    "url": "https://example.com/article",
+    "timestamp": "2024-01-01T12:00:00Z"
+}
 ```
-3. Run the tests:
-```bash
-./test_api.sh
-```
-
-The test script includes:
-- Getting the list of channels
-- Adding a new channel
-- Getting channel ID
-- Deleting a channel
-- Testing rate limiting
-
-## Rate Limiting
-
-The service implements rate limiting to prevent abuse:
-- Window: 60 seconds
-- Maximum requests: 100 per window
-- Rate limit headers are included in responses
-- Returns 429 status code when limit is exceeded
-
-## Security Considerations
-
-1. Store your Telegram API credentials securely in the `.env` file
-2. The service uses CORS middleware (configured for development)
-3. Rate limiting is enabled by default
-4. WebSocket connections are validated
-5. All API endpoints are protected by rate limiting
 
 ## Development
 
 ### Project Structure
 ```
-telegram_fetcher/
-├── main.py           # Main service entry point
-├── jsondb.py         # JSON-based channel storage
-├── jsondb_api.py     # REST API implementation
-├── tg_client_pool.py # Telegram client management
-├── tg_config.py      # Configuration and credentials
-├── test_api.sh       # API testing script
-└── tests/            # Test suite
+news_collector/
+├── telegram_fetcher/          # Telegram monitoring service
+│   ├── main.py               # Main service entry point
+│   ├── jsondb.py             # JSON-based channel storage
+│   ├── jsondb_api.py         # REST API implementation
+│   ├── tg_client_pool.py     # Telegram client management
+│   ├── tg_config.py          # Configuration and credentials
+│   └── tests/                # Test suite
+│
+└── sites_fetcher/            # News website monitoring service
+    ├── monitor/              # News monitoring service
+    ├── websocket_server/     # WebSocket server
+    ├── sources.json          # News source configuration
+    ├── docker-compose.yml    # Docker configuration
+    └── requirements.txt      # Python dependencies
 ```
 
 ### Running Tests
+
+1. Telegram Fetcher tests:
 ```bash
 # Run API tests
-./test_api.sh
+./telegram_fetcher/test_api.sh
 
 # Run unit tests
 pytest telegram_fetcher/tests/
 ```
+
+2. News Socket Proxy tests:
+```bash
+cd sites_fetcher
+pytest tests/
+```
+
+## Security Considerations
+
+1. Store API credentials securely in `.env` files
+2. Both services implement rate limiting
+3. CORS middleware is configured
+4. WebSocket connections are validated
+5. Redis is protected by password (in production)
+
+## Monitoring
+
+### Telegram Fetcher
+- API logs: Available through uvicorn logging
+- WebSocket connection status: Available through the API
+- Channel status: Available through the API
+
+### News Socket Proxy
+- Monitor service logs: `monitor.log`
+- WebSocket server logs: `websocket.log`
+- Redis state: Use Redis CLI to inspect article keys
 
 ## Contributing
 
@@ -236,7 +267,7 @@ pytest telegram_fetcher/tests/
 
 ## License
 
-This project is licensed under the terms of the license included in the repository.
+This project is licensed under the MIT License.
 
 ## Support
 
