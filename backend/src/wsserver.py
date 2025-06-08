@@ -11,14 +11,30 @@ class WSServer:
     def __init__(self, pubsub: PubSub, redis_client, host: str, port: int):
         self.pubsub = pubsub
         self.redis = redis_client
-        self.clients = set()
+        self.clients = {}  # websocket: {"user_id": "...", "channels": set()}
         self.host = host
         self.port = port
         self.server = None
 
     async def handler(self, websocket):
-        self.clients.add(websocket)
         try:
+            # Первое сообщение - аутентификация
+            auth = await websocket.recv()
+            token = json.loads(auth)["token"]
+            
+            # Проверка токена
+            user_id = self.redis.get(f"auth:token:{token}")
+            if not user_id:
+                await websocket.close(code=4001)
+                return
+                
+            # Загружаем подписки пользователя
+            channels = self.redis.smembers(f"user:channels:{user_id}")
+            self.clients[websocket] = {
+                "user_id": user_id,
+                "channels": set(map(int, channels))
+            }
+
             async for _ in websocket:
                 pass
         finally:
@@ -36,8 +52,8 @@ class WSServer:
         # Запуск broadcast в отдельном event loop
         asyncio.run_coroutine_threadsafe(self.broadcast(post), self.loop)
 
+    # Запуск WebSocket сервера в отдельном потоке с собственным event loop
     def start(self):
-        """Запуск WebSocket сервера в отдельном потоке с собственным event loop"""
         def run_server():
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)

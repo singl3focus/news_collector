@@ -5,7 +5,7 @@ CONFIG_FILE = "config.yaml"
 
 
 def define_log_level(level: str) -> int:
-    level = level.upper().strip()
+    level = level.lower().strip()
 
     if level == "debug":
         return logging.DEBUG
@@ -20,8 +20,6 @@ def define_log_level(level: str) -> int:
 
 
 def setup_logging() -> None:
-    """Настройка логирования при запуске приложения"""
-
     cfg = config.parse_config(CONFIG_FILE)
 
     root_logger = logging.getLogger()
@@ -53,22 +51,18 @@ logger = logging.getLogger(__name__)
 
 import asyncio
 import threading 
+import uvicorn 
 from src import redis_init
 from src import filter
 from src import wsserver
+from src import restserver
 from src.ranking import ranking_news
 from src.pubsub import *
 
 
-"""
-TODO:
-- создание pub/sub (общение между этапами через него).
-- пайплайн (этапы): получение постов (посты приходят по одному) > Тональность > Ранжирование > WS сервер.
-- в Main происходит запуск вебсокет сервера в отдельном потоке, который отправляет посты клиентам.
-Также после отправки добавляется пост добавляется в кэш (redis) с TTL в 1 день.
-
-После сделать работу с юзерами в БД (redis). CRON, который в 19 по МСК собирает инфу по юзерам и скидывает их
-"""
+def run_rest(host: str = "0.0.0.0", port: int = 9080, redis_host: str = "localhost", redis_port: int = 6379):
+    app = restserver.create_app(redis_host=redis_host, redis_port=redis_port)
+    uvicorn.run(app, host=host, port=port)
 
 
 async def main_async():
@@ -90,6 +84,9 @@ async def main_async():
     event_bus.subscribe(EVENT_FULL_POST, ws_server.process_event)
     ws_server.start()
 
+    # Запуск REST API в отдельном потоке
+    threading.Thread(target=run_rest, daemon=True).start()
+
     # Запуск обработки сообщений как асинхронной задачи
     asyncio.create_task(filter.receive_posts(cfg.network.collector_uri, event_bus))
 
@@ -99,7 +96,6 @@ async def main_async():
 
 
 def main():
-    """Точка входа в приложение"""
     asyncio.run(main_async())
 
 
@@ -107,7 +103,7 @@ def tonal_callback(data: filter.NewsPost, pubsub: PubSub) -> None:
     logger.info(f"[tonal] Get post: {data}")
 
     good, new_data = ranking_news.is_good_news(data)
-    if good:
+    if good and new_data is not None:
         pubsub.publish(EVENT_FILTERED_POST, new_data)
 
 

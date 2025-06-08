@@ -8,5 +8,5 @@ database:
   port: "6379"
 
 logger:
-  log_level: "DEBUG"
+  log_level: "info"
   log_file: "news_processor.log"

@@ -2,6 +2,7 @@ from . import analysis_text
 from .analysis_stock_market import MoexStockAnalyzer
 from datetime import datetime, timedelta
 from dataclasses import dataclass
+from typing import Tuple, Optional
 
 moex_stock_analyzer = MoexStockAnalyzer()
 
@@ -16,12 +17,13 @@ class Post:
     channel_title: str
     timestamp: int = 0
 
-def is_good_news(post, change_stock=0.01) -> {bool, Post | None}:
+def is_good_news(post, change_stock=0.01) -> Tuple[bool, Optional[Post]]:
     global start_stack_embs, stack_embs
 
     if (datetime.now() - start_stack_embs) >= timedelta(days=1):
         stack_embs.clear()
         start_stack_embs = datetime.now()  # Обновляем время сброса
+
     emb, tonality = analysis_text.get_info_text(post.text)
 
     if analysis_text.check_equality_emb(emb, stack_embs):
