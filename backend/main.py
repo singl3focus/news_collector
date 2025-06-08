@@ -86,7 +86,7 @@ async def main_async():
     ws_server.start()
 
     # Запуск REST API в отдельном потоке
-    threading.Thread(target=run_rest, daemon=True, args=(cfg.network.collector_http)).start()
+    threading.Thread(target=run_rest, daemon=True, args=(cfg.network.collector_http,)).start()
 
     # Запуск обработки сообщений как асинхронной задачи
     asyncio.create_task(filter.receive_posts(cfg.network.collector_uri, event_bus))
@@ -124,6 +124,7 @@ def tonal_callback(data: filter.NewsPost, pubsub: PubSub) -> None:
         volatility=-1, # 1 - high, -1 - low
         channel_id=data.channel_id,
         channel_title=data.channel_title,
+        channel_url=data.channel_url,
         timestamp=data.timestamp
     )
 

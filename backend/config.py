@@ -68,6 +68,7 @@ def parse_config(file_path: str) -> FullConfig:
         network_data = raw_config['network']
         network = NetworkConfig(
             collector_uri=network_data['collector_uri'],
+            collector_http=network_data['collector_http'],
             wsserver=Server(**network_data['wsserver']),
             restserver=Server(**network_data['restserver'])
         )

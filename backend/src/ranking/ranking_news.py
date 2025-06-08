@@ -17,6 +17,7 @@ class Post:
     trend: int # 1 - up, -1 - down
     volatility: int # 1 - high, 0 - low
     channel_id: str
+    channel_url: str
     channel_title: str
     timestamp: int = 0
 

@@ -73,13 +73,13 @@ curl -X POST "http://localhost:9080/login?username=alice"
 ```POST /users/{user_id}/channels```
 
 Параметры:
-- channel_id (int): ID канала для подписки
+- channel_name (int): ID канала для подписки
 - Заголовок Authorization: Токен доступа
 
 Пример запроса:
 
 ```bash
-curl -X POST -H "Authorization: kL8sZ...qW2" "http://localhost:9080/users/me/channels?channel_id=123"
+curl -X POST -H "Authorization: kL8sZ...qW2" "http://localhost:9080/users/me/channels?channel_name=example_channel"
 ```
 
 Успешный ответ (200 OK):
@@ -95,15 +95,15 @@ user_id в пути игнорируется - используется ID из 
 Пользователь автоматически подписывается на канал 0 при регистрации
 
 4. Удаление канала из подписок
-```DELETE /users/{user_id}/channels/{channel_id}```
+```DELETE /users/{user_id}/channels```
 
 Параметры:
-- channel_id (int): ID канала для отписки
+- channel_name (int): ID канала для отписки
 - Заголовок Authorization: Токен доступа
 
 Пример запроса:
 ```bash
-curl -X DELETE -H "Authorization: kL8sZ...qW2" http://localhost:9080/users/me/channels/123
+curl -X DELETE -H "Authorization: kL8sZ...qW2" http://localhost:9080/users/me/channels?channel_name=example_channel
 ```
 
 Успешный ответ (200 OK):
@@ -112,6 +112,17 @@ curl -X DELETE -H "Authorization: kL8sZ...qW2" http://localhost:9080/users/me/ch
   "status": "removed",
   "channel_id": 123
 }
+```
+
+5. Удаление всех каналов из подписок
+```DELETE /user/channels/all```
+
+Параметры:
+- Заголовок Authorization: Токен доступа
+
+Пример запроса:
+```bash
+curl -X DELETE -H "Authorization: kL8sZ...qW2" http://localhost:9080/user/channels/all
 ```
 
 ### Аутентификация
@@ -154,9 +165,10 @@ user:channels:<user_id> = {0, 123, 456}
   "text": "Компания Apple представила новый iPhone 15 с революционными функциями",
   "tonality": 1,
   "trend": 1,
-  "volatility": 0,
-  "channel_id": "tech_news_123",
+  "volatility": 1,
+  "channel_id": "133113113",
   "channel_title": "Технологические новости",
+  "channel_url": "Ссылка на канал",
   "timestamp": 1691500000
 }
 ```

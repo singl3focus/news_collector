@@ -32,10 +32,14 @@ class NewsPost:
     raw_timestamp: str
     channel_id: str
     channel_title: str
+    channel_url: str
     timestamp: int = 0
     simhash: int = 0
 
     def __post_init__(self):
+        if self.channel_url == "":
+            self.channel_url = "https://t.me"
+
         try:
             dt = datetime.fromisoformat(self.raw_timestamp.replace("Z", "+00:00"))
             self.timestamp = int(dt.timestamp())
@@ -111,6 +115,7 @@ async def receive_posts(uri: str, pubsub: PubSub):
                         text=data["text"],
                         raw_timestamp=data["timestamp"],
                         channel_id=data["channel_id"],
+                        channel_url=data["channel_url"],
                         channel_title=data.get("channel_title", "Unknown")
                     )
 

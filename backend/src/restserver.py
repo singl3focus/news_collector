@@ -60,6 +60,9 @@ class RedisService:
     def remove_channel(self, user_id: str, channel_id: int):
         self.redis.srem(f"user:channels:{user_id}", channel_id)
 
+    def remove_all_channels(self, user_id: str) -> None:
+        self.redis.delete(f"user:channels:{user_id}")
+
     def get_channel_id_by_link(self, link: str) -> int:
         try:
             response = requests.get(f"http://{self.domain}/api/channel_id/{link}")
@@ -116,16 +119,26 @@ def create_app(domain: str, redis_host: str = "localhost", redis_port: int = 637
         return {"status": "success", "token": token}
 
     @app.post("/users/{user_id}/channels")
-    def add_channel(link: str, user_id: str = Depends(get_current_user)):
+    def add_channel(channel_name: str, user_id: str = Depends(get_current_user)):
+        link = f"https://t.me/{channel_name}"
         channel_id = redis_service.get_channel_id_by_link(link)
 
         redis_service.add_channel(user_id, channel_id)
         redis_service.external_api_add_channel(link)
         return {"status": "added", "channel_id": channel_id}
 
-    @app.delete("/users/{user_id}/channels/{channel_id}")
-    def remove_channel(channel_id: int, user_id: str = Depends(get_current_user)):
+    @app.delete("/users/{user_id}/channels")
+    def remove_channel(channel_name: int, user_id: str = Depends(get_current_user)):
+        link = f"https://t.me/{channel_name}"
+        channel_id = redis_service.get_channel_id_by_link(link)
+
         redis_service.remove_channel(user_id, channel_id)
         return {"status": "removed", "channel_id": channel_id}
 
+    @app.delete("/user/channels/all")
+    def remove_all_channels(user_id: str = Depends(get_current_user)):
+        redis_service.remove_all_channels(user_id)
+        return {"status": "all channels removed"}
+
     return app
+
