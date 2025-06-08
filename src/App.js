@@ -45,7 +45,7 @@ function App() {
   const wsRef = useRef(null);
 
   useEffect(() => {
-    wsRef.current = new WebSocket('ws://localhost:8765');
+    wsRef.current = new WebSocket('ws://192.168.52.12:9999');
 
     wsRef.current.onmessage = (event) => {
       const message = event.data;
