@@ -38,6 +38,7 @@ class Server:
 @dataclass
 class NetworkConfig:
     collector_uri: str
+    collector_http: str
     wsserver: Server  # Исправлено: должен быть объект Server
     restserver: Server  # Исправлено: должен быть объект Server
 

@@ -15,6 +15,6 @@ def get_info_text(text: str):
 def check_equality_emb(emb, embs):
     if embs:
         if max(cosine_similarity([emb], embs)[0]) > 0.6:
-            return False
+            return True
         
-    return True
+    return False

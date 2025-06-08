@@ -38,10 +38,6 @@ def is_good_news(post, change_stock=0.01) -> Tuple[bool, Optional[Post]]:
 
     if analysis_text.check_equality_emb(emb, stack_embs):
         return False, None 
-
-    analysis_stock = moex_stock_analyzer.analyze_stocks(change_stock)
-    if not analysis_stock:
-        return False, None 
     
     if tonality["label"] == "NEUTRAL": # max(analysis_stock['change']) - min(analysis_stock['change']) < change_stock or 
         return False, None
@@ -51,8 +47,13 @@ def is_good_news(post, change_stock=0.01) -> Tuple[bool, Optional[Post]]:
     elif tonality["label"] == "NEGATIVE":
         tonality = -1
 
-    trend = analysis_stock['trend'].value_counts().idxmax()
-    volatility = analysis_stock['volatility'].value_counts().idxmax()
+    analysis_stock = moex_stock_analyzer.analyze_stocks(change_stock)
+    if analysis_stock.empty:
+        trend = 0
+        volatility = 0
+    else:
+        trend = int(analysis_stock['trend'].value_counts().idxmax())
+        volatility = int(analysis_stock['volatility'].value_counts().idxmax())
         
 
     if not stack_embs:

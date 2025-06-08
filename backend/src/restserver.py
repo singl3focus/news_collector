@@ -3,6 +3,7 @@ from fastapi.security import APIKeyHeader
 import redis
 import secrets
 import json
+import requests
 from typing import Optional, Dict, List
 
 KEY_ID = "id"
@@ -10,8 +11,9 @@ KEY_USERNAME = "username"
 KEY_TOKENS = "tokens"
 
 class RedisService:
-    def __init__(self, redis_client: redis.Redis):
+    def __init__(self, redis_client: redis.Redis, domain: str):
         self.redis = redis_client
+        self.domain = domain
 
     def create_user(self, username: str) -> Dict[str, str]:
         user_id = f"user_{secrets.token_hex(8)}"
@@ -58,7 +60,30 @@ class RedisService:
     def remove_channel(self, user_id: str, channel_id: int):
         self.redis.srem(f"user:channels:{user_id}", channel_id)
 
-def create_app(redis_host: str = "localhost", redis_port: int = 6379):
+    def get_channel_id_by_link(self, link: str) -> int:
+        try:
+            response = requests.get(f"http://{self.domain}/api/channel_id/{link}")
+            response.raise_for_status()
+            
+            data = response.json()
+            if not data.get("ok"):
+                raise HTTPException(status_code=400, detail="Invalid channel link")
+                
+            return data["channel_id"]
+        except requests.exceptions.RequestException as e:
+            raise HTTPException(status_code=502, detail=f"Failed to fetch channel_id: {e}")
+        
+    def external_api_add_channel(self, link: str) -> bool:
+        try:
+            response = requests.post(
+                "http://{self.domain}/api/add_channel",
+                json={"link": link}
+            )
+            return response.json().get("ok", False)
+        except Exception:
+            return 
+
+def create_app(domain: str, redis_host: str = "localhost", redis_port: int = 6379):
     app = FastAPI()
     
     # Создаем схему аутентификации
@@ -70,7 +95,7 @@ def create_app(redis_host: str = "localhost", redis_port: int = 6379):
         port=redis_port,
         decode_responses=True
     )
-    redis_service = RedisService(redis_client)
+    redis_service = RedisService(redis_client, domain)
     
     # Передаем схему аутентификации при создании зависимости
     get_current_user = redis_service.get_current_user_dependency(api_key_scheme)
@@ -91,8 +116,11 @@ def create_app(redis_host: str = "localhost", redis_port: int = 6379):
         return {"status": "success", "token": token}
 
     @app.post("/users/{user_id}/channels")
-    def add_channel(channel_id: int, user_id: str = Depends(get_current_user)):
+    def add_channel(link: str, user_id: str = Depends(get_current_user)):
+        channel_id = redis_service.get_channel_id_by_link(link)
+
         redis_service.add_channel(user_id, channel_id)
+        redis_service.external_api_add_channel(link)
         return {"status": "added", "channel_id": channel_id}
 
     @app.delete("/users/{user_id}/channels/{channel_id}")

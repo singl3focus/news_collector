@@ -20,7 +20,7 @@ class MoexStockAnalyzer:
     def get_market_data(self, ticker):
         try:
             url = f"{self.base_url}/engines/stock/markets/shares/boards/{self.board}/securities/{ticker}.json?iss.only=marketdata"
-            response = self.session.get(url, timeout=20).json()
+            response = self.session.get(url, timeout=10).json()
             return response["marketdata"]["data"][0] if response["marketdata"]["data"] else None
         except Exception as e:
             return None
@@ -70,13 +70,15 @@ class MoexStockAnalyzer:
                     'change_percent': data[fields['change_prcnt']],
                     'volume': data[fields['volume']],
                     'time': data[fields['time']] if fields['time'] < len(data) else None,
-                    'price_range': data[fields['high'] - data[fields['low']]],
+                    'price_range': data[fields['high']] - data[fields['low']],
                 }
 
                 if result['change'] > change_stock:
                     result['trend'] = 1
                 elif result['change'] < -change_stock:
                     result['trend'] = -1
+                else:
+                    result['trend'] = 0
 
                 if result['price_range'] > data[fields['open']] * 0.01:
                     result['volatility'] = 1

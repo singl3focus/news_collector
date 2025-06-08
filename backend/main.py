@@ -61,8 +61,8 @@ from src.ranking import ranking_news
 from src.pubsub import *
 
 
-def run_rest(host: str = "0.0.0.0", port: int = 9080, redis_host: str = "localhost", redis_port: int = 6379):
-    app = restserver.create_app(redis_host=redis_host, redis_port=redis_port)
+def run_rest(collector_http, host: str = "0.0.0.0", port: int = 9080, redis_host: str = "localhost", redis_port: int = 6379):
+    app = restserver.create_app(collector_http, redis_host=redis_host, redis_port=redis_port)
     uvicorn.run(app, host=host, port=port)
 
 
@@ -86,7 +86,7 @@ async def main_async():
     ws_server.start()
 
     # Запуск REST API в отдельном потоке
-    threading.Thread(target=run_rest, daemon=True).start()
+    threading.Thread(target=run_rest, daemon=True, args=(cfg.network.collector_http)).start()
 
     # Запуск обработки сообщений как асинхронной задачи
     asyncio.create_task(filter.receive_posts(cfg.network.collector_uri, event_bus))
